@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Part 4: 기술 설정 &amp; 사전 제작 - CCGS + UE5.6 가이드</title>
+<link rel="stylesheet" href="style.css">
+</head><body>
+<div class="topbar">
+  <div class="topbar-left"><a href="index.html" class="topbar-home">&larr; 목차</a><span class="topbar-part">Part 4 / 5</span></div>
+  <div class="topbar-nav">
+    <a href="part1-setup.html">1</a><a href="part2-concept.html">2</a><a href="part3-design.html">3</a><a href="part4-architecture.html" class="cur">4</a><a href="part5-production.html">5</a>
+  </div>
+</div>
+
+<div class="page-head">
+  <span class="part-badge pb-4">Part 4 of 5</span>
+  <h1>기술 설정 &amp; 사전 제작 &mdash; 구현 준비</h1>
+  <p>설계 문서를 실제 구현 계획으로 변환합니다. 아키텍처 결정, 에픽/스토리 분해, 스프린트 계획까지</p>
+</div>
+
+<div class="content">
+
+<!-- ===== STEP 1: /create-architecture ===== -->
+<div class="step">
+  <div class="step-label"><span class="step-num sn-b">1</span><h2>/create-architecture &mdash; 마스터 아키텍처 문서 만들기</h2></div>
+
+  <div class="card">
+    <h3>"아키텍처"가 뭔가요?</h3>
+    <p>건물을 지을 때 "기둥이 어디 가고, 배관은 어디로 지나가는지"를 정하는 <strong>구조 설계도</strong>가 있듯이, 게임도 "전투 시스템이 체력 시스템과 어떻게 연결되고, 데이터는 어디에 저장되는지"를 미리 정합니다. 이것이 아키텍처입니다.</p>
+  </div>
+
+  <div class="card">
+    <h3>Claude에게 아키텍처 생성 요청하기</h3>
+    <p>Claude가 Part 3에서 작성한 <strong>모든 GDD</strong>를 읽고, 전체 게임의 기술 구조를 설계합니다.</p>
+    <div class="term">
+      <div class="term-bar"><span class="td td-r"></span><span class="td td-y"></span><span class="td td-g"></span><span class="term-t">아키텍처 생성</span></div>
+      <div class="term-body"><span class="u">나 &gt;</span> <span class="s">/create-architecture</span>
+
+<span class="ai">Claude (Tech Lead): "모든 GDD를 분석해서 마스터 아키텍처를 작성합니다."</span>
+<span class="ai">        "분석할 GDD: combat.md, health.md, inventory.md, save-load.md..."</span>
+
+<span class="w">━━ UE5.6 기술 스택 선택 ━━</span>
+<span class="ai">Claude: "이 게임에 최적인 UE5.6 시스템들을 추천합니다:"</span>
+<span class="ai">  ┌─────────────────┬───────────────────────────────┐</span>
+<span class="ai">  │ 기능            │ UE5.6 시스템                  │</span>
+<span class="ai">  ├─────────────────┼───────────────────────────────┤</span>
+<span class="ai">  │ 전투/스킬       │ Gameplay Ability System (GAS)  │</span>
+<span class="ai">  │ 입력 처리       │ Enhanced Input System          │</span>
+<span class="ai">  │ UI/메뉴         │ CommonUI + UMG                │</span>
+<span class="ai">  │ 조명/렌더링     │ Lumen (글로벌 일루미네이션)    │</span>
+<span class="ai">  │ 메시/지오메트리 │ Nanite (자동 LOD)             │</span>
+<span class="ai">  │ 이펙트          │ Niagara (파티클 시스템)        │</span>
+<span class="ai">  │ 사운드          │ MetaSounds                    │</span>
+<span class="ai">  └─────────────────┴───────────────────────────────┘</span>
+<span class="ai">  "동의하시나요? 수정할 부분이 있으면 말씀해주세요."</span>
+<span class="u">나 &gt;</span> 좋아요, 그대로 진행해주세요
+
+<span class="w">━━ 모듈 구조 ━━</span>
+<span class="ai">Claude: "게임을 다음 모듈로 나눕니다:"</span>
+<span class="ai">  Core       &mdash; 게임 기본 설정, 데이터 타입</span>
+<span class="ai">  Combat     &mdash; GAS 기반 전투, 콤보, 데미지</span>
+<span class="ai">  Character  &mdash; 플레이어/NPC 캐릭터 로직</span>
+<span class="ai">  UI         &mdash; HUD, 메뉴, 인벤토리 화면</span>
+<span class="ai">  World      &mdash; 레벨, 스폰, 환경</span>
+<span class="ai">  SaveSystem &mdash; 저장/불러오기</span>
+
+<span class="c">  ✓ architecture/master-architecture.md 생성 완료</span>
+<span class="c">  ✓ architecture/module-dependency-graph.md 생성 완료</span></div>
+    </div>
+  </div>
+
+  <div class="info tip">
+    <span class="info-i">💡</span>
+    <div><strong>이 용어들을 몰라도 괜찮습니다!</strong><p>Claude가 각 기술이 왜 필요한지 쉬운 말로 설명해줍니다. 예: "GAS는 레고 블록처럼 스킬을 조립하는 시스템"이라고 설명합니다.</p></div>
+  </div>
+</div>
+
+<!-- ===== STEP 2: /architecture-decision ===== -->
+<div class="step">
+  <div class="step-label"><span class="step-num sn-b">2</span><h2>/architecture-decision &mdash; 기술 결정 기록하기</h2></div>
+
+  <div class="card">
+    <h3>"ADR"이 뭔가요?</h3>
+    <p><strong>Architecture Decision Record</strong>의 약자로, "왜 이 기술을 골랐는가"를 기록하는 문서입니다. 나중에 "왜 이렇게 만들었지?" 할 때 되돌아볼 수 있습니다.</p>
+  </div>
+
+  <div class="card">
+    <h3>기술 결정 예시: GAS 선택</h3>
+    <div class="term">
+      <div class="term-bar"><span class="td td-r"></span><span class="td td-y"></span><span class="td td-g"></span><span class="term-t">ADR 작성</span></div>
+      <div class="term-body"><span class="u">나 &gt;</span> <span class="s">/architecture-decision "전투 시스템에 GAS 사용"</span>
+
+<span class="ai">Claude: "ADR을 작성합니다. 몇 가지 질문이 있어요."</span>
+
+<span class="w">━━ 옵션 비교 ━━</span>
+<span class="ai">Claude: "전투 시스템 구현에 3가지 방법이 있습니다:"</span>
+<span class="ai">  A) GAS (Gameplay Ability System)</span>
+<span class="ai">     장점: 버프/디버프 자동 관리, 멀티플레이 대응, 에픽 공식 지원</span>
+<span class="ai">     단점: 초기 설정이 복잡함</span>
+<span class="ai">  B) 커스텀 전투 시스템 (직접 구현)</span>
+<span class="ai">     장점: 단순하게 시작 가능</span>
+<span class="ai">     단점: 기능 추가할수록 복잡해짐, 버그 위험</span>
+<span class="ai">  C) 플러그인 사용 (마켓플레이스)</span>
+<span class="ai">     장점: 빠른 시작</span>
+<span class="ai">     단점: 커스터마이징 제한, 유지보수 어려움</span>
+<span class="ai">  "어떤 것을 선택하시겠어요?"</span>
+<span class="u">나 &gt;</span> A. GAS로 해주세요
+
+<span class="ai">Claude: "좋은 선택입니다! ADR을 기록합니다:"</span>
+<span class="ai">  결정: GAS 사용</span>
+<span class="ai">  이유: 장기적 확장성과 멀티플레이 대응</span>
+<span class="ai">  결과: 초기 설정에 1-2일 추가 소요 예상</span>
+<span class="c">  ✓ architecture/adr/ADR-001-combat-gas.md 저장 완료</span></div>
+    </div>
+  </div>
+
+  <div class="info note">
+    <span class="info-i">📝</span>
+    <div><p>중요한 기술 결정이 있을 때마다 <code>/architecture-decision</code>을 실행합니다. 예: 입력 시스템 선택, 네트워크 방식, 저장 포맷 등. Claude가 매번 장단점을 비교해줍니다.</p></div>
+  </div>
+</div>
+
+<!-- ===== STEP 3: /create-epics ===== -->
+<div class="step">
+  <div class="step-label"><span class="step-num sn-b">3</span><h2>/create-epics &mdash; GDD를 에픽으로 분해하기</h2></div>
+
+  <div class="card">
+    <h3>"에픽"이 뭔가요?</h3>
+    <p><strong>에픽(Epic)</strong>은 "전투 시스템 전체 구현"처럼 <strong>큰 덩어리의 작업</strong>입니다. 너무 커서 한 번에 못 끝내기 때문에, 나중에 더 작은 조각(스토리)으로 나눕니다. 책으로 치면 "챕터" 같은 것입니다.</p>
+  </div>
+
+  <div class="card">
+    <h3>에픽 생성하기</h3>
+    <div class="term">
+      <div class="term-bar"><span class="td td-r"></span><span class="td td-y"></span><span class="td td-g"></span><span class="term-t">에픽 분해</span></div>
+      <div class="term-body"><span class="u">나 &gt;</span> <span class="s">/create-epics</span>
+
+<span class="ai">Claude: "모든 GDD를 분석해서 에픽을 생성합니다..."</span>
+
+<span class="w">━━ 에픽 목록 (우선순위별) ━━</span>
+<span class="ai">  EP-001 │ 플레이어 이동 &amp; 카메라     │ P0 (MVP) │ ~5 스토리</span>
+<span class="ai">  EP-002 │ 기본 전투 (GAS)             │ P0 (MVP) │ ~8 스토리</span>
+<span class="ai">  EP-003 │ 체력 &amp; 데미지 시스템        │ P0 (MVP) │ ~4 스토리</span>
+<span class="ai">  EP-004 │ 인벤토리 기본               │ P0 (MVP) │ ~5 스토리</span>
+<span class="ai">  EP-005 │ 적 AI &amp; 스폰               │ P1       │ ~6 스토리</span>
+<span class="ai">  EP-006 │ UI &amp; HUD                    │ P1       │ ~7 스토리</span>
+<span class="ai">  EP-007 │ 보스 전투                    │ P1       │ ~4 스토리</span>
+<span class="ai">  EP-008 │ 저장/불러오기               │ P1       │ ~3 스토리</span>
+<span class="ai">  EP-009 │ 사운드 &amp; 이펙트             │ P2       │ ~5 스토리</span>
+<span class="ai">  EP-010 │ 레벨 디자인                  │ P2       │ ~6 스토리</span>
+<span class="ai">  ───────────────────────────────────────────────────</span>
+<span class="ai">  합계: 10 에픽, ~53 스토리 예상</span>
+
+<span class="ai">  "이 구성이 맞나요? 추가/수정할 에픽이 있으면 말씀해주세요."</span>
+<span class="u">나 &gt;</span> 좋아요!
+
+<span class="c">  ✓ backlog/epics.md 생성 완료</span></div>
+    </div>
+  </div>
+
+  <div class="info ai">
+    <span class="info-i">🤖</span>
+    <div><strong>P0/P1/P2는 우선순위입니다:</strong><p><strong>P0 (MVP)</strong> = 게임이 돌아가려면 반드시 필요, <strong>P1</strong> = 있으면 훨씬 좋음, <strong>P2</strong> = 나중에 추가해도 됨</p></div>
+  </div>
+</div>
+
+<!-- ===== STEP 4: /create-stories ===== -->
+<div class="step">
+  <div class="step-label"><span class="step-num sn-b">4</span><h2>/create-stories &mdash; 에픽을 스토리로 쪼개기</h2></div>
+
+  <div class="card">
+    <h3>"스토리"가 뭔가요?</h3>
+    <p><strong>스토리(Story)</strong>는 "경공격 3타 콤보 구현"처럼 <strong>하루 이틀 안에 끝낼 수 있는 작은 작업</strong>입니다. 에픽이 "챕터"라면, 스토리는 그 안의 "한 페이지"입니다. Claude가 실제로 코딩하는 단위가 바로 이 스토리입니다.</p>
+  </div>
+
+  <div class="card">
+    <h3>에픽을 스토리로 분해하기</h3>
+    <div class="term">
+      <div class="term-bar"><span class="td td-r"></span><span class="td td-y"></span><span class="td td-g"></span><span class="term-t">스토리 생성</span></div>
+      <div class="term-body"><span class="g"># EP-002 (기본 전투)를 스토리로 쪼개기</span>
+<span class="u">나 &gt;</span> <span class="s">/create-stories EP-002</span>
+
+<span class="ai">Claude: "EP-002 (기본 전투 시스템)의 스토리를 생성합니다:"</span>
+
+<span class="w">━━ EP-002의 스토리 목록 ━━</span>
+<span class="ai">  ST-001 │ GAS 플러그인 활성화 &amp; 기본 클래스       │ 낮음 │ 1일</span>
+<span class="ai">  ST-002 │ 경공격 3타 콤보 구현                      │ 중간 │ 2일</span>
+<span class="ai">  ST-003 │ 중공격 &amp; 차지 어택 구현                   │ 중간 │ 2일</span>
+<span class="ai">  ST-004 │ 회피 (대시/구르기) 구현                    │ 낮음 │ 1일</span>
+<span class="ai">  ST-005 │ 패리 시스템 (타이밍 기반)                  │ 높음 │ 3일</span>
+<span class="ai">  ST-006 │ 잡기 공격 구현                            │ 중간 │ 2일</span>
+<span class="ai">  ST-007 │ 히트 리액션 &amp; 넉백                       │ 중간 │ 2일</span>
+<span class="ai">  ST-008 │ 콤보 카운터 UI 연동                       │ 낮음 │ 1일</span>
+
+<span class="ai">  "각 스토리에 수용 기준(Acceptance Criteria)도 작성되어 있어요."</span>
+<span class="ai">  "구성을 조정하시겠어요?"</span>
+<span class="u">나 &gt;</span> ST-005 패리가 좀 어려울 것 같은데, 2개로 나눌 수 있어요?
+
+<span class="ai">Claude: "좋은 생각입니다! ST-005를 나눕니다:"</span>
+<span class="ai">  ST-005a │ 기본 패리 (블록 → 반격)         │ 중간 │ 2일</span>
+<span class="ai">  ST-005b │ 완벽 패리 (타이밍 보너스)       │ 중간 │ 1일</span>
+<span class="c">  ✓ backlog/stories/EP-002-stories.md 저장 완료</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>스토리에 포함되는 항목</h3>
+    <table class="tbl">
+      <thead><tr><th>항목</th><th>예시 (ST-002)</th></tr></thead>
+      <tbody>
+        <tr><td><code>ID</code></td><td>ST-002</td></tr>
+        <tr><td><code>제목</code></td><td>경공격 3타 콤보 구현</td></tr>
+        <tr><td><code>설명</code></td><td>Enhanced Input으로 공격 입력을 받아 3단 콤보 실행</td></tr>
+        <tr><td><code>수용 기준</code></td><td>① 공격 버튼 3회 → 3타 콤보 ② 타이밍 창 내 입력만 연결 ③ 각 타격에 히트 이펙트</td></tr>
+        <tr><td><code>복잡도</code></td><td>중간 (2일)</td></tr>
+        <tr><td><code>의존성</code></td><td>ST-001 (GAS 기본 설정) 완료 필요</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ===== STEP 5: /sprint-plan ===== -->
+<div class="step">
+  <div class="step-label"><span class="step-num sn-b">5</span><h2>/sprint-plan new &mdash; 첫 번째 스프린트 계획하기</h2></div>
+
+  <div class="card">
+    <h3>"스프린트"가 뭔가요?</h3>
+    <p><strong>스프린트(Sprint)</strong>는 <strong>1~2주 동안 집중해서 작업하는 기간</strong>입니다. 마라톤처럼 한 번에 달리는 게 아니라, 짧은 구간을 전력 질주하듯 작은 목표를 정해서 완성합니다. 스프린트가 끝나면 결과를 확인하고, 다음 스프린트를 계획합니다.</p>
+  </div>
+
+  <div class="card">
+    <h3>첫 스프린트 계획 세우기</h3>
+    <div class="term">
+      <div class="term-bar"><span class="td td-r"></span><span class="td td-y"></span><span class="td td-g"></span><span class="term-t">스프린트 계획</span></div>
+      <div class="term-body"><span class="u">나 &gt;</span> <span class="s">/sprint-plan new</span>
+
+<span class="ai">Claude: "스프린트 1을 계획합니다."</span>
+<span class="ai">  기간: 2주</span>
+<span class="ai">  목표: "플레이어가 움직이고 기본 공격을 할 수 있다"</span>
+
+<span class="w">━━ 스프린트 1 스토리 선택 ━━</span>
+<span class="ai">  ✓ ST-001 │ GAS 기본 설정         │ 1일  │ EP-002</span>
+<span class="ai">  ✓ ST-002 │ 경공격 3타 콤보        │ 2일  │ EP-002</span>
+<span class="ai">  ✓ EP1-ST-001 │ 플레이어 이동      │ 2일  │ EP-001</span>
+<span class="ai">  ✓ EP1-ST-002 │ 카메라 시스템      │ 1일  │ EP-001</span>
+<span class="ai">  ✓ EP3-ST-001 │ 체력 컴포넌트      │ 1일  │ EP-003</span>
+<span class="ai">  ─────────────────────────────────────────</span>
+<span class="ai">  합계: 5개 스토리, 약 7일 작업량</span>
+
+<span class="ai">  "의존성 확인: ST-002는 ST-001 완료 후 시작합니다."</span>
+<span class="ai">  "이 계획으로 진행할까요?"</span>
+<span class="u">나 &gt;</span> 네, 시작합시다!
+
+<span class="c">  ✓ sprints/sprint-001.md 저장 완료</span></div>
+    </div>
+  </div>
+
+  <div class="info warn">
+    <span class="info-i">⚠️</span>
+    <div><strong>의존성이 중요합니다!</strong><p>Claude는 자동으로 "이 스토리가 먼저 끝나야 저 스토리를 시작할 수 있다"는 순서를 파악합니다. 예: GAS 설정(ST-001)이 끝나야 콤보(ST-002)를 만들 수 있습니다.</p></div>
+  </div>
+</div>
+
+<!-- ===== STEP 6: gate-check ===== -->
+<div class="step">
+  <div class="step-label"><span class="step-num sn-b">6</span><h2>/gate-check &mdash; 프로덕션 진입 준비 확인</h2></div>
+
+  <div class="card">
+    <h3>구현을 시작해도 되는지 검증합니다</h3>
+    <div class="term">
+      <div class="term-bar"><span class="td td-r"></span><span class="td td-y"></span><span class="td td-g"></span><span class="term-t">게이트 체크</span></div>
+      <div class="term-body"><span class="u">나 &gt;</span> <span class="s">/gate-check</span>
+
+<span class="ai">Claude: "Phase 3-4 (기술 설정 &amp; 사전 제작) 완료 검증 중..."</span>
+<span class="ai">  ✓ master-architecture.md 존재</span>
+<span class="ai">  ✓ ADR 기록 완료 (3개)</span>
+<span class="ai">  ✓ 에픽 백로그 생성됨 (10개 에픽)</span>
+<span class="ai">  ✓ 스토리 백로그 생성됨 (53개 스토리)</span>
+<span class="ai">  ✓ 스프린트 1 계획 완료</span>
+<span class="ai">  ✓ 의존성 그래프 검증 통과</span>
+
+<span class="h">  결과: PASS &mdash; Production 단계 진입 가능!</span></div>
+    </div>
+  </div>
+
+  <div class="info tip">
+    <span class="info-i">🎉</span>
+    <div><strong>드디어 코딩 준비 완료!</strong><p>Part 5에서는 이 계획에 따라 실제 UE5.6 게임 코드를 만들어갑니다. Claude가 C++ 코드를 작성하고, 여러분은 결정만 하면 됩니다.</p></div>
+  </div>
+</div>
+
+<!-- Summary -->
+<div class="step">
+  <div class="step-label"><span class="step-num sn-b">✓</span><h2>Part 4 완료! 생성된 파일들</h2></div>
+  <div class="card">
+    <table class="tbl">
+      <thead><tr><th>파일</th><th>내용</th></tr></thead>
+      <tbody>
+        <tr><td><code>architecture/master-architecture.md</code></td><td>전체 기술 구조 설계도</td></tr>
+        <tr><td><code>architecture/module-dependency-graph.md</code></td><td>모듈 간 의존성 그래프</td></tr>
+        <tr><td><code>architecture/adr/ADR-001-combat-gas.md</code></td><td>GAS 선택 결정 기록</td></tr>
+        <tr><td><code>architecture/adr/ADR-002-*.md</code></td><td>기타 기술 결정 기록들</td></tr>
+        <tr><td><code>backlog/epics.md</code></td><td>에픽 목록 (10개)</td></tr>
+        <tr><td><code>backlog/stories/EP-*-stories.md</code></td><td>에픽별 스토리 목록 (~53개)</td></tr>
+        <tr><td><code>sprints/sprint-001.md</code></td><td>첫 번째 스프린트 계획</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="nav-foot">
+  <a href="part3-design.html" class="btn btn-sec">&larr; Part 3: 시스템 설계</a>
+  <a href="part5-production.html" class="btn btn-pri">Part 5: 프로덕션 &rarr;</a>
+</div>
+</div>
+</body></html>

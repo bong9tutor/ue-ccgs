@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Part 2: 게임 컨셉 만들기 - CCGS + UE5.6 가이드</title>
+<link rel="stylesheet" href="style.css">
+</head><body>
+<div class="topbar">
+  <div class="topbar-left"><a href="index.html" class="topbar-home">&larr; 목차</a><span class="topbar-part">Part 2 / 5</span></div>
+  <div class="topbar-nav">
+    <a href="part1-setup.html">1</a><a href="part2-concept.html" class="cur">2</a><a href="part3-design.html">3</a><a href="part4-architecture.html">4</a><a href="part5-production.html">5</a>
+  </div>
+</div>
+
+<div class="page-head">
+  <span class="part-badge pb-2">Part 2 of 5</span>
+  <h1>게임 컨셉 만들기</h1>
+  <p>Claude와 대화하며 게임 아이디어를 발전시키고, 엔진을 설정하고, 게임의 시스템을 정리합니다</p>
+</div>
+
+<div class="content">
+
+<!-- ===== STEP 1: /start ===== -->
+<div class="step">
+  <div class="step-label"><span class="step-num sn-o">1</span><h2>첫 명령어: /start 입력하기</h2></div>
+
+  <div class="card">
+    <h3>CCGS의 모든 시작은 /start 입니다</h3>
+    <p>Part 1에서 <code>claude</code>를 실행한 상태에서 아래와 같이 입력합니다.</p>
+    <div class="term">
+      <div class="term-bar"><span class="td td-r"></span><span class="td td-y"></span><span class="td td-g"></span><span class="term-t">claude code</span></div>
+      <div class="term-body"><span class="u">나 &gt;</span> <span class="s">/start</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Claude가 보여주는 화면</h3>
+    <p>Claude가 프로젝트 상태를 분석한 후 <strong>4가지 선택지</strong>를 물어봅니다.</p>
+    <div class="term">
+      <div class="term-bar"><span class="td td-r"></span><span class="td td-y"></span><span class="td td-g"></span><span class="term-t">claude 응답</span></div>
+      <div class="term-body"><span class="ai">Claude: "Claude Code Game Studios에 오신 것을 환영합니다!</span>
+<span class="ai">        지금 게임 아이디어 관점에서 어디쯤 계신가요?"</span>
+
+<span class="ai">  A) 아이디어가 전혀 없어요</span>
+<span class="ai">  B) 모호한 아이디어가 있어요 (장르나 테마 정도)</span>
+<span class="ai">  C) 명확한 컨셉이 있어요</span>
+<span class="ai">  D) 이미 만든 작업물이 있어요</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>어떻게 답하면 되나요?</h3>
+    <p>그냥 자연스럽게 대답하시면 됩니다. 예를 들어:</p>
+    <div class="term">
+      <div class="term-bar"><span class="td td-r"></span><span class="td td-y"></span><span class="td td-g"></span><span class="term-t">답변 예시</span></div>
+      <div class="term-body"><span class="g"># 아이디어가 없을 때</span>
+<span class="u">나 &gt;</span> A
+
+<span class="g"># 모호한 아이디어가 있을 때</span>
+<span class="u">나 &gt;</span> B. 로그라이크 느낌의 게임을 만들고 싶어요
+
+<span class="g"># 명확한 아이디어가 있을 때</span>
+<span class="u">나 &gt;</span> C. 3인칭 액션 RPG인데, 실시간 전투가 있는 게임이에요</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>다음으로 Claude가 물어보는 것: 리뷰 모드</h3>
+    <div class="term">
+      <div class="term-bar"><span class="td td-r"></span><span class="td td-y"></span><span class="td td-g"></span><span class="term-t">리뷰 모드 선택</span></div>
+      <div class="term-body"><span class="ai">Claude: "작업하면서 얼마나 많은 검토를 원하시나요?"</span>
+
+<span class="ai">  Full  &mdash; 매 단계마다 전문가가 검토 (꼼꼼하지만 느림)</span>
+<span class="ai">  Lean  &mdash; 단계 넘어갈 때만 검토 (권장!)</span>
+<span class="ai">  Solo  &mdash; 검토 없이 빠르게 진행</span>
+
+<span class="u">나 &gt;</span> Lean
+<span class="ai">Claude: "좋습니다! Lean 모드로 설정했습니다."</span></div>
+    </div>
+    <div class="info tip">
+      <span class="info-i">&#x2705;</span>
+      <div><strong>비전공자라면 "Lean"을 추천합니다.</strong><p>Full은 너무 느리고, Solo는 검증 없이 넘어가서 나중에 문제가 생길 수 있습니다.</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== STEP 2: /brainstorm ===== -->
+<div class="step">
+  <div class="step-label"><span class="step-num sn-o">2</span><h2>/brainstorm &mdash; 게임 아이디어 만들기</h2></div>
+
+  <div class="card">
+    <h3>이게 뭘 하는 명령어인가요?</h3>
+    <p>Claude의 <strong>Creative Director(창작 감독) 에이전트</strong>가 여러분과 대화하며 게임 아이디어를 발전시킵니다. 게임 디자인 전문 기법(MDA 프레임워크 등)을 사용합니다. 아이디어가 없어도 Claude가 질문을 하며 이끌어줍니다.</p>
+  </div>
+
+  <div class="card">
+    <h3>실행하기</h3>
+    <div class="term">
+      <div class="term-bar"><span class="td td-r"></span><span class="td td-y"></span><span class="td td-g"></span><span class="term-t">brainstorm 시작</span></div>
+      <div class="term-body"><span class="g"># 아이디어가 없을 때</span>
+<span class="u">나 &gt;</span> <span class="s">/brainstorm</span>
+
+<span class="g"># 힌트가 있을 때 (아무 말이나 붙여도 됩니다)</span>
+<span class="u">나 &gt;</span> <span class="s">/brainstorm 좀비 서바이벌</span>
+<span class="u">나 &gt;</span> <span class="s">/brainstorm 귀여운 동물 농장 게임</span>
+<span class="u">나 &gt;</span> <span class="s">/brainstorm 우주 탐험 로그라이크</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Claude와 대화하는 과정 (실제 예시)</h3>
+    <p>Claude가 차례차례 질문하고, 여러분이 대답하면 됩니다. 정답은 없습니다!</p>
+    <div class="term">
+      <div class="term-bar"><span class="td td-r"></span><span class="td td-y"></span><span class="td td-g"></span><span class="term-t">brainstorm 대화 예시 (축약)</span></div>
+      <div class="term-body"><span class="ai">Claude: "게임에서 가장 감동받거나 중독된 순간이 있으세요?"</span>
+<span class="u">나 &gt;</span> 다크소울에서 보스 잡았을 때 짜릿했어요
+
+<span class="ai">Claude: "가장 많이 한 게임 3개는요? 왜 좋아하셨어요?"</span>
+<span class="u">나 &gt;</span> 젤다, 엘든링, 하데스. 탐험이랑 전투가 좋아서요
+
+<span class="ai">Claude: "좋습니다! 취향 프로필을 정리하면:</span>
+<span class="ai">  - 감정: 도전의 짜릿함, 발견의 기쁨</span>
+<span class="ai">  - 선호: 탐험 + 액션전투 + 성장</span>
+<span class="ai">  맞으세요?"</span>
+<span class="u">나 &gt;</span> 네 맞아요!
+
+<span class="ai">Claude: "3가지 완전히 다른 콘셉트를 만들었습니다:"</span>
+<span class="ai"></span>
+<span class="ai">  1. 「Ember Knight」 - 3인칭 액션 RPG</span>
+<span class="ai">     "불의 힘을 다루는 기사가 저주받은 세계를 탐험"</span>
+<span class="ai">     핵심 동사: 전투, 탐험, 강화</span>
+<span class="ai"></span>
+<span class="ai">  2. 「Void Drifter」 - 로그라이크 탑다운 슈터</span>
+<span class="ai">     "우주 잔해 사이를 떠돌며 생존하는 1인 파일럿"</span>
+<span class="ai">     핵심 동사: 회피, 수집, 조합</span>
+<span class="ai"></span>
+<span class="ai">  3. 「Stone &amp; Spirit」 - 오픈월드 탐험</span>
+<span class="ai">     "고대 유적의 정령과 교감하며 세계를 복원"</span>
+<span class="ai">     핵심 동사: 탐험, 퍼즐, 교감</span>
+<span class="ai"></span>
+<span class="ai">  "어떤 콘셉트가 끌리세요?"</span>
+<span class="u">나 &gt;</span> 1번이 좋아요! Ember Knight로 가겠습니다</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>이후 Claude가 자동으로 하는 것들</h3>
+    <p>선택한 콘셉트에 대해 Claude가 더 깊이 있게 질문하며 다음을 정의합니다:</p>
+    <table class="tbl">
+      <thead><tr><th>항목</th><th>Claude가 하는 것</th><th>여러분이 하는 것</th></tr></thead>
+      <tbody>
+        <tr><td>코어 루프</td><td>30초/5분/세션/장기 루프 제안</td><td>"맞아요" 또는 수정 요청</td></tr>
+        <tr><td>게임 필라</td><td>3~5개 핵심 기둥 정의</td><td>확인 또는 수정</td></tr>
+        <tr><td>타겟 플레이어</td><td>Bartle 분류법으로 분석</td><td>동의 또는 조정</td></tr>
+        <tr><td>범위(Scope)</td><td>MVP ~ Full Vision 단계 정의</td><td>현실적 범위 선택</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>최종 결과: game-concept.md 파일 생성</h3>
+    <div class="term">
+      <div class="term-bar"><span class="td td-r"></span><span class="td td-y"></span><span class="td td-g"></span><span class="term-t">brainstorm 완료</span></div>
+      <div class="term-body"><span class="ai">Claude: "게임 콘셉트가 완성되었습니다!</span>
+<span class="ai">        design/gdd/game-concept.md에 작성할까요?"</span>
+
+<span class="u">나 &gt;</span> 네, 작성해주세요
+
+<span class="ai">Claude: "&#x2713; design/gdd/game-concept.md 생성 완료"</span>
+<span class="ai">        "다음 단계: /setup-engine 으로 엔진 설정"</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== STEP 3: /setup-engine ===== -->
+<div class="step">
+  <div class="step-label"><span class="step-num sn-o">3</span><h2>/setup-engine &mdash; 언리얼 엔진 5.6 설정하기</h2></div>
+
+  <div class="card">
+    <h3>이건 뭘 하는 건가요?</h3>
+    <p>CCGS에게 <strong>"우리 게임은 언리얼 엔진 5.6으로 만들 거야"</strong>라고 알려주는 것입니다. 이 설정에 따라 이후 모든 에이전트가 UE5.6에 맞는 기술과 패턴을 사용합니다.</p>
+  </div>
+
+  <div class="card">
+    <h3>실행하기</h3>
+    <div class="term">
+      <div class="term-bar"><span class="td td-r"></span><span class="td td-y"></span><span class="td td-g"></span><span class="term-t">엔진 설정</span></div>
+      <div class="term-body"><span class="u">나 &gt;</span> <span class="s">/setup-engine unreal 5.6</span>
+
+<span class="ai">Claude: "Unreal Engine 5.6 설정을 시작합니다."</span>
+<span class="ai">        "이전에 Unreal Engine을 사용해본 적 있으세요?"</span>
+
+<span class="u">나 &gt;</span> 아니요, 처음이에요
+
+<span class="ai">Claude: "알겠습니다! 초보자에게 적합한 설정으로 진행합니다."</span>
+<span class="ai"></span>
+<span class="ai">  설정 결과:</span>
+<span class="ai">  - 엔진: Unreal Engine 5.6</span>
+<span class="ai">  - 언어: C++ (핵심 로직) + Blueprint (게임 콘텐츠)</span>
+<span class="ai">  - 렌더링: Lumen (실시간 글로벌 일루미네이션)</span>
+<span class="ai">  - 지오메트리: Nanite (자동 최적화)</span>
+<span class="ai">  - 입력: Enhanced Input</span>
+<span class="ai">  - UI: CommonUI</span>
+<span class="ai"></span>
+<span class="ai">  "CLAUDE.md에 이 설정을 저장할까요?"</span>
+
+<span class="u">나 &gt;</span> 네
+
+<span class="ai">  &#x2713; CLAUDE.md 업데이트 완료</span>
+<span class="ai">  &#x2713; .claude/docs/technical-preferences.md 생성 완료</span>
+<span class="ai">  &#x2713; docs/engine-reference/unreal/ 레퍼런스 생성 완료</span>
+<span class="ai"></span>
+<span class="ai">  "다음 단계: /map-systems 으로 시스템 분해"</span></div>
+    </div>
+  </div>
+
+  <div class="info ai">
+    <span class="info-i">&#x1f4a1;</span>
+    <div><strong>"C++를 모르는데 괜찮나요?"</strong><p>네, 괜찮습니다! CCGS의 AI 에이전트들이 C++ 코드를 대신 작성합니다. 여러분은 "어떤 기능을 만들지" 결정하고, Claude가 코드를 작성합니다. Blueprint(시각적 프로그래밍)도 함께 사용하므로 코드 없이도 일부 로직을 만들 수 있습니다.</p></div>
+  </div>
+</div>
+
+<!-- ===== STEP 4: /map-systems ===== -->
+<div class="step">
+  <div class="step-label"><span class="step-num sn-o">4</span><h2>/map-systems &mdash; 게임 시스템 분해하기</h2></div>
+
+  <div class="card">
+    <h3>"시스템 분해"가 뭔가요?</h3>
+    <p>게임을 구성하는 <strong>기능 단위들</strong>을 나누는 것입니다. 예를 들어 액션 RPG는 "전투 시스템", "인벤토리 시스템", "AI 시스템", "세이브 시스템" 등으로 나뉩니다. 이걸 정리해야 하나씩 설계하고 만들 수 있습니다.</p>
+  </div>
+
+  <div class="card">
+    <h3>실행하기</h3>
+    <div class="term">
+      <div class="term-bar"><span class="td td-r"></span><span class="td td-y"></span><span class="td td-g"></span><span class="term-t">시스템 분해</span></div>
+      <div class="term-body"><span class="u">나 &gt;</span> <span class="s">/map-systems</span>
+
+<span class="ai">Claude (Game Designer): "game-concept.md를 분석합니다..."</span>
+<span class="ai"></span>
+<span class="ai">  &lt;Ember Knight&gt; 에서 발견한 시스템들:</span>
+<span class="ai"></span>
+<span class="ai">  [명시적 시스템 - 게임 콘셉트에서 직접 언급된 것]</span>
+<span class="ai">  1. Combat (전투)       &mdash; 실시간 콤보, 회피, 스킬</span>
+<span class="ai">  2. Progression (성장)  &mdash; 레벨, 스탯, 스킬 트리</span>
+<span class="ai">  3. Exploration (탐험)  &mdash; 맵 이동, 던전, 퀘스트</span>
+<span class="ai"></span>
+<span class="ai">  [암묵적 시스템 - 위 시스템이 작동하려면 필요한 것]</span>
+<span class="ai">  4. Health/Damage       &mdash; 체력, 데미지 계산</span>
+<span class="ai">  5. Inventory (인벤토리) &mdash; 아이템, 장비</span>
+<span class="ai">  6. Enemy AI (적 AI)     &mdash; 적의 행동 패턴</span>
+<span class="ai">  7. Save/Load (저장)     &mdash; 게임 진행 상황 저장</span>
+<span class="ai">  8. UI/HUD              &mdash; 화면에 보이는 정보</span>
+<span class="ai">  9. Input (입력)         &mdash; 키보드/패드 조작</span>
+<span class="ai"> 10. Animation (애니메이션) &mdash; 캐릭터 동작</span>
+<span class="ai"></span>
+<span class="ai">  "빠진 시스템이 있나요? 제거할 것은요?"</span>
+
+<span class="u">나 &gt;</span> 사운드 시스템도 추가해주세요. 나머지는 좋아요!
+
+<span class="ai">  &#x2713; Audio (사운드) 시스템 추가</span>
+<span class="ai">  &#x2713; 의존성 매핑 완료</span>
+<span class="ai">  &#x2713; 우선순위 할당 완료:</span>
+<span class="ai">    MVP:      Input, Health, Combat, Save</span>
+<span class="ai">    Alpha:    Inventory, AI, Progression, Animation</span>
+<span class="ai">    Full:     Exploration, Audio, UI/HUD</span>
+<span class="ai"></span>
+<span class="ai">  "design/gdd/systems-index.md에 작성할까요?"</span>
+
+<span class="u">나 &gt;</span> 네
+
+<span class="ai">  &#x2713; design/gdd/systems-index.md 생성 완료</span>
+<span class="ai">  "다음 단계: /design-system 으로 각 시스템별 GDD 작성"</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- Summary -->
+<div class="step">
+  <div class="step-label"><span class="step-num sn-o">&#x2713;</span><h2>Part 2 완료! 지금까지 만든 것들</h2></div>
+  <div class="card">
+    <table class="tbl">
+      <thead><tr><th>파일</th><th>내용</th><th>만든 명령어</th></tr></thead>
+      <tbody>
+        <tr><td><code>design/gdd/game-concept.md</code></td><td>게임 콘셉트 (아이디어, 코어 루프, 필라, MVP)</td><td><code>/brainstorm</code></td></tr>
+        <tr><td><code>CLAUDE.md</code></td><td>엔진 설정 (UE 5.6)</td><td><code>/setup-engine</code></td></tr>
+        <tr><td><code>.claude/docs/technical-preferences.md</code></td><td>기술 스택 상세 설정</td><td><code>/setup-engine</code></td></tr>
+        <tr><td><code>design/gdd/systems-index.md</code></td><td>시스템 목록, 의존성, 우선순위</td><td><code>/map-systems</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="info tip">
+    <span class="info-i">&#x2705;</span>
+    <div><strong>언제든 /help를 입력하세요!</strong><p>지금 뭘 해야 하는지 모르겠으면 <code>/help</code>를 입력하면 Claude가 현재 상태를 분석하고 다음에 할 일을 알려줍니다.</p></div>
+  </div>
+</div>
+
+<div class="nav-foot">
+  <a href="part1-setup.html" class="btn btn-sec">&larr; Part 1: 설치</a>
+  <a href="part3-design.html" class="btn btn-pri">Part 3: 시스템 설계 &rarr;</a>
+</div>
+</div>
+</body></html>

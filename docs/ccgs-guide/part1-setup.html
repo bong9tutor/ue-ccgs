@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Part 1: 사전 준비 - CCGS + UE5.6 가이드</title>
+<link rel="stylesheet" href="style.css">
+</head><body>
+<div class="topbar">
+  <div class="topbar-left">
+    <a href="index.html" class="topbar-home">&larr; 목차</a>
+    <span class="topbar-part">Part 1 / 5</span>
+  </div>
+  <div class="topbar-nav">
+    <a href="part1-setup.html" class="cur">1</a>
+    <a href="part2-concept.html">2</a>
+    <a href="part3-design.html">3</a>
+    <a href="part4-architecture.html">4</a>
+    <a href="part5-production.html">5</a>
+  </div>
+</div>
+
+<div class="page-head">
+  <span class="part-badge pb-1">Part 1 of 5</span>
+  <h1>사전 준비 &mdash; 프로그램 설치하기</h1>
+  <p>게임 개발을 시작하기 위해 필요한 모든 프로그램을 컴퓨터에 설치합니다.<br>처음 하시는 분도 그대로 따라하시면 됩니다.</p>
+</div>
+
+<div class="content">
+
+<!-- ===== STEP 1: Git 설치 ===== -->
+<div class="step">
+  <div class="step-label"><span class="step-num sn-g">1</span><h2>Git 설치하기</h2></div>
+
+  <div class="card">
+    <h3>Git이 뭔가요?</h3>
+    <p>Git은 <strong>파일의 변경 이력을 관리</strong>하는 프로그램입니다. 게임을 만들면서 "어제 버전으로 돌아가고 싶다"할 때 사용합니다. CCGS 프로젝트를 다운로드할 때도 필요합니다.</p>
+  </div>
+
+  <div class="card">
+    <h3>Windows에서 설치하기</h3>
+    <ul class="ck" onclick="event.target.closest('li')?.classList.toggle('on')">
+      <li><span class="cb">&#x2713;</span><span class="ct">웹 브라우저에서 <strong><a href="https://git-scm.com/download/win" target="_blank">git-scm.com/download/win</a></strong> 접속</span></li>
+      <li><span class="cb">&#x2713;</span><span class="ct"><strong>"Click here to download"</strong> 클릭하여 설치 파일 다운로드</span></li>
+      <li><span class="cb">&#x2713;</span><span class="ct">다운로드된 파일 실행 &rarr; <strong>모든 옵션을 기본값 그대로</strong> "Next" 클릭</span></li>
+      <li><span class="cb">&#x2713;</span><span class="ct">마지막에 <strong>"Install"</strong> 클릭 &rarr; 설치 완료</span></li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>설치 확인하기</h3>
+    <p>시작 메뉴에서 <strong>"명령 프롬프트"</strong> 또는 <strong>"터미널"</strong>을 검색하여 실행하세요. (Mac은 "터미널" 앱)</p>
+    <div class="term">
+      <div class="term-bar"><span class="td td-r"></span><span class="td td-y"></span><span class="td td-g"></span><span class="term-t">terminal</span></div>
+      <div class="term-body"><span class="c">$ git --version</span>
+<span class="o">git version 2.47.1    &larr; 이런 식으로 버전 번호가 나오면 성공!</span></div>
+    </div>
+  </div>
+
+  <div class="info warn">
+    <span class="info-i">&#x26a0;</span>
+    <div><strong>"git을 찾을 수 없습니다" 오류가 나오면?</strong><p>컴퓨터를 재시작한 후 다시 시도하세요. 그래도 안 되면 Git을 다시 설치하되, 설치 중 "Add to PATH" 옵션이 체크되어 있는지 확인하세요.</p></div>
+  </div>
+</div>
+
+<!-- ===== STEP 2: Node.js 설치 ===== -->
+<div class="step">
+  <div class="step-label"><span class="step-num sn-g">2</span><h2>Node.js 설치하기</h2></div>
+
+  <div class="card">
+    <h3>Node.js가 뭔가요?</h3>
+    <p>Claude Code를 실행하기 위해 필요한 프로그램입니다. Claude Code가 Node.js 위에서 동작합니다.</p>
+  </div>
+
+  <div class="card">
+    <h3>설치 순서</h3>
+    <ul class="ck" onclick="event.target.closest('li')?.classList.toggle('on')">
+      <li><span class="cb">&#x2713;</span><span class="ct"><strong><a href="https://nodejs.org" target="_blank">nodejs.org</a></strong> 접속</span></li>
+      <li><span class="cb">&#x2713;</span><span class="ct">초록색 <strong>"LTS"</strong> 버튼 클릭하여 다운로드 (Recommended 버전)</span></li>
+      <li><span class="cb">&#x2713;</span><span class="ct">다운로드된 파일 실행 &rarr; <strong>기본값 그대로</strong> Next &rarr; Install</span></li>
+    </ul>
+    <div class="term">
+      <div class="term-bar"><span class="td td-r"></span><span class="td td-y"></span><span class="td td-g"></span><span class="term-t">설치 확인</span></div>
+      <div class="term-body"><span class="c">$ node --version</span>
+<span class="o">v22.x.x    &larr; 버전 번호가 나오면 성공!</span>
+
+<span class="c">$ npm --version</span>
+<span class="o">10.x.x     &larr; npm도 같이 설치됩니다</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== STEP 3: Claude Code 설치 ===== -->
+<div class="step">
+  <div class="step-label"><span class="step-num sn-g">3</span><h2>Claude Code 설치하기</h2></div>
+
+  <div class="card">
+    <h3>Claude Code가 뭔가요?</h3>
+    <p>Anthropic이 만든 <strong>AI 코딩 도구</strong>입니다. 터미널에서 Claude AI와 대화하며 코드를 작성할 수 있습니다. CCGS는 이 Claude Code 위에서 동작하는 프레임워크입니다.</p>
+  </div>
+
+  <div class="card">
+    <h3>설치하기</h3>
+    <p>터미널에 아래 명령어를 <strong>그대로 복사해서 붙여넣고 Enter</strong>를 누르세요.</p>
+    <div class="term">
+      <div class="term-bar"><span class="td td-r"></span><span class="td td-y"></span><span class="td td-g"></span><span class="term-t">terminal</span></div>
+      <div class="term-body"><span class="c">$ npm install -g @anthropic-ai/claude-code</span>
+
+<span class="o">... 설치 진행 중 (1~2분 소요) ...</span>
+<span class="o">added 1 package in 30s</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Anthropic API 키 설정 (필수)</h3>
+    <p>Claude Code를 사용하려면 <strong>Anthropic 계정</strong>과 <strong>API 키</strong>가 필요합니다.</p>
+    <ul class="ck" onclick="event.target.closest('li')?.classList.toggle('on')">
+      <li><span class="cb">&#x2713;</span><span class="ct"><strong><a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a></strong> 접속 &rarr; 회원가입 또는 로그인</span></li>
+      <li><span class="cb">&#x2713;</span><span class="ct">좌측 메뉴 <strong>"API Keys"</strong> 클릭</span></li>
+      <li><span class="cb">&#x2713;</span><span class="ct"><strong>"Create Key"</strong> 클릭 &rarr; 이름 입력 (예: "game-dev") &rarr; 키 복사</span></li>
+      <li><span class="cb">&#x2713;</span><span class="ct">터미널에서 아래 명령어 실행 (키를 따옴표 안에 붙여넣기):</span></li>
+    </ul>
+    <div class="term">
+      <div class="term-bar"><span class="td td-r"></span><span class="td td-y"></span><span class="td td-g"></span><span class="term-t">Windows</span></div>
+      <div class="term-body"><span class="g"># Windows (명령 프롬프트)</span>
+<span class="c">$ set ANTHROPIC_API_KEY=sk-ant-여기에-복사한-키-붙여넣기</span>
+
+<span class="g"># Mac / Linux (터미널)</span>
+<span class="c">$ export ANTHROPIC_API_KEY=sk-ant-여기에-복사한-키-붙여넣기</span></div>
+    </div>
+  </div>
+
+  <div class="info tip">
+    <span class="info-i">&#x2705;</span>
+    <div><strong>매번 입력하기 귀찮다면?</strong><p>Claude Code를 처음 실행하면 자동으로 로그인/인증 과정을 안내합니다. 화면에 나오는 안내를 따라가시면 됩니다.</p></div>
+  </div>
+
+  <div class="card">
+    <h3>설치 확인</h3>
+    <div class="term">
+      <div class="term-bar"><span class="td td-r"></span><span class="td td-y"></span><span class="td td-g"></span><span class="term-t">terminal</span></div>
+      <div class="term-body"><span class="c">$ claude --version</span>
+<span class="o">claude-code x.x.x    &larr; 버전 번호가 나오면 성공!</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== STEP 4: Unreal Engine 5.6 설치 ===== -->
+<div class="step">
+  <div class="step-label"><span class="step-num sn-g">4</span><h2>Unreal Engine 5.6 설치하기</h2></div>
+
+  <div class="card">
+    <h3>필요한 컴퓨터 사양</h3>
+    <table class="tbl">
+      <thead><tr><th>항목</th><th>최소 사양</th><th>권장 사양</th></tr></thead>
+      <tbody>
+        <tr><td>RAM</td><td>16GB</td><td>32GB</td></tr>
+        <tr><td>저장 공간</td><td>SSD 50GB 이상</td><td>SSD 100GB 이상</td></tr>
+        <tr><td>그래픽카드</td><td>GTX 1070 / RX 580</td><td>RTX 3060 이상</td></tr>
+        <tr><td>운영체제</td><td colspan="2">Windows 10/11 64비트, macOS (일부 제한)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>설치 순서</h3>
+    <ul class="ck" onclick="event.target.closest('li')?.classList.toggle('on')">
+      <li><span class="cb">&#x2713;</span><span class="ct"><strong><a href="https://www.unrealengine.com/download" target="_blank">unrealengine.com/download</a></strong> 접속</span></li>
+      <li><span class="cb">&#x2713;</span><span class="ct"><strong>Epic Games 계정 생성</strong> (무료) &rarr; 로그인</span></li>
+      <li><span class="cb">&#x2713;</span><span class="ct"><strong>Epic Games Launcher</strong> 다운로드 &rarr; 설치 &rarr; 실행</span></li>
+      <li><span class="cb">&#x2713;</span><span class="ct">좌측 메뉴에서 <strong>"Unreal Engine"</strong> 클릭</span></li>
+      <li><span class="cb">&#x2713;</span><span class="ct">상단 <strong>"라이브러리"</strong> 탭 클릭</span></li>
+      <li><span class="cb">&#x2713;</span><span class="ct">엔진 버전 옆 <strong>"+"</strong> 버튼 클릭</span></li>
+      <li><span class="cb">&#x2713;</span><span class="ct">드롭다운에서 <strong>"5.6"</strong> 선택</span></li>
+      <li><span class="cb">&#x2713;</span><span class="ct"><strong>"설치"</strong> 클릭 &rarr; 설치 위치를 <strong>SSD</strong>로 지정</span></li>
+      <li><span class="cb">&#x2713;</span><span class="ct">설치 완료 대기 (30분~2시간 소요)</span></li>
+    </ul>
+  </div>
+
+  <div class="info warn">
+    <span class="info-i">&#x26a0;</span>
+    <div><strong>반드시 SSD에 설치하세요!</strong><p>HDD에 설치하면 에디터 로딩이 매우 느려져서 작업이 거의 불가능합니다.</p></div>
+  </div>
+
+  <div class="info tip">
+    <span class="info-i">&#x2705;</span>
+    <div><strong>무료입니다!</strong><p>언리얼 엔진은 개인 사용 및 연매출 100만 달러 미만 시 완전 무료입니다.</p></div>
+  </div>
+</div>
+
+<!-- ===== STEP 5: CCGS 프로젝트 다운로드 ===== -->
+<div class="step">
+  <div class="step-label"><span class="step-num sn-g">5</span><h2>CCGS 프로젝트 다운로드 (클론)</h2></div>
+
+  <div class="card">
+    <h3>"클론"이 뭔가요?</h3>
+    <p>GitHub에 있는 프로젝트를 내 컴퓨터로 복사하는 것입니다. "다운로드"와 비슷하지만 Git의 버전 관리 기능이 함께 옵니다.</p>
+  </div>
+
+  <div class="card">
+    <h3>실행하기</h3>
+    <p>터미널에서 아래 명령어를 <strong>한 줄씩</strong> 입력하고 Enter를 누르세요.</p>
+    <div class="term">
+      <div class="term-bar"><span class="td td-r"></span><span class="td td-y"></span><span class="td td-g"></span><span class="term-t">terminal</span></div>
+      <div class="term-body"><span class="g"># 1. 바탕화면으로 이동 (원하는 위치로 변경 가능)</span>
+<span class="c">$ cd Desktop</span>
+
+<span class="g"># 2. CCGS 프로젝트 다운로드</span>
+<span class="c">$ git clone https://github.com/bong9tutor/Claude-Code-Game-Studios.git my-game</span>
+<span class="o">Cloning into 'my-game'...</span>
+<span class="o">remote: Enumerating objects: 500, done.</span>
+<span class="o">... (다운로드 중) ...</span>
+
+<span class="g"># 3. 프로젝트 폴더로 이동</span>
+<span class="c">$ cd my-game</span></div>
+    </div>
+    <div class="info note">
+      <span class="info-i">&#x1f4a1;</span>
+      <div><strong>"my-game"</strong>은 프로젝트 폴더 이름입니다. 원하는 이름으로 바꿔도 됩니다. (예: <code>my-rpg-game</code>)</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== STEP 6: 첫 Claude Code 세션 시작 ===== -->
+<div class="step">
+  <div class="step-label"><span class="step-num sn-g">6</span><h2>첫 Claude Code 세션 시작하기</h2></div>
+
+  <div class="card">
+    <h3>Claude 세션 시작</h3>
+    <p>프로젝트 폴더(my-game) 안에서 아래 명령어를 입력합니다.</p>
+    <div class="term">
+      <div class="term-bar"><span class="td td-r"></span><span class="td td-y"></span><span class="td td-g"></span><span class="term-t">terminal &mdash; 첫 세션</span></div>
+      <div class="term-body"><span class="c">$ claude</span>
+
+<span class="w">=== Claude Code Game Studios &mdash; Session Context ===</span>
+<span class="o">Branch: main</span>
+<span class="o">Recent commits:</span>
+<span class="o">  abc1234 Initial commit</span>
+<span class="w">===================================</span>
+
+<span class="ai">Claude &gt; </span><span class="o">_    &larr; 여기에 명령어를 입력하면 됩니다!</span></div>
+    </div>
+  </div>
+
+  <div class="info ai">
+    <span class="info-i">&#x1f389;</span>
+    <div><strong>축하합니다!</strong><p>위 화면이 나타났다면 CCGS가 정상적으로 작동하고 있습니다! "=== Claude Code Game Studios ===" 메시지는 CCGS의 자동 훅이 세션을 시작하며 표시하는 것입니다. 이제 <strong>Part 2</strong>에서 게임 만들기를 시작합니다.</p></div>
+  </div>
+
+  <div class="info warn">
+    <span class="info-i">&#x26a0;</span>
+    <div><strong>"Session Context" 메시지가 안 나온다면?</strong><p>다음을 확인하세요: (1) <code>my-game</code> 폴더 안에서 <code>claude</code>를 실행했는지 (2) <code>.claude</code> 폴더가 존재하는지 (<code>ls -la</code>로 확인) (3) API 키가 설정되어 있는지</p></div>
+  </div>
+</div>
+
+<!-- Navigation -->
+<div class="nav-foot">
+  <a href="index.html" class="btn btn-sec">&larr; 목차로</a>
+  <a href="part2-concept.html" class="btn btn-pri">Part 2: 게임 컨셉 만들기 &rarr;</a>
+</div>
+
+</div>
+
+<script>
+document.querySelectorAll('.ck li').forEach(li=>{
+  li.addEventListener('click',()=>li.classList.toggle('on'));
+});
+</script>
+</body></html>
