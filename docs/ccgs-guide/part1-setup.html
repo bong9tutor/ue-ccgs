@@ -185,9 +185,9 @@
   </div>
 </div>
 
-<!-- ===== STEP 5: CCGS 프로젝트 다운로드 ===== -->
+<!-- ===== STEP 5: 통합 가이드 레포 다운로드 ===== -->
 <div class="step">
-  <div class="step-label"><span class="step-num sn-g">5</span><h2>CCGS 프로젝트 다운로드 (클론)</h2></div>
+  <div class="step-label"><span class="step-num sn-g">5</span><h2>가이드 &amp; 샘플 프로젝트 다운로드 (클론)</h2></div>
 
   <div class="card">
     <h3>"클론"이 뭔가요?</h3>
@@ -195,44 +195,97 @@
   </div>
 
   <div class="card">
+    <h3>무엇을 받게 되나요?</h3>
+    <p>아래 명령어로 다운로드하는 <code>ue-ccgs</code> 저장소에는 <strong>3가지가 모두 포함</strong>되어 있어서 바로 실습을 시작할 수 있습니다.</p>
+    <table class="tbl">
+      <thead><tr><th>구성 요소</th><th>위치</th><th>역할</th></tr></thead>
+      <tbody>
+        <tr><td>📖 가이드 사이트</td><td><code>docs/ccgs-guide/</code></td><td>지금 보고 있는 5개 파트 HTML</td></tr>
+        <tr><td>🧠 CCGS 프레임워크</td><td><code>.claude/</code> · <code>design/</code> · <code>production/</code></td><td>에이전트·스킬·훅이 즉시 동작</td></tr>
+        <tr><td>🎮 샘플 UE 프로젝트</td><td><code>MadeByClaudeCode/</code></td><td>UE 5.6 Blank C++ 스켈레톤</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
     <h3>실행하기</h3>
     <p>터미널에서 아래 명령어를 <strong>한 줄씩</strong> 입력하고 Enter를 누르세요.</p>
     <div class="term">
       <div class="term-bar"><span class="td td-r"></span><span class="td td-y"></span><span class="td td-g"></span><span class="term-t">terminal</span></div>
-      <div class="term-body"><span class="g"># 1. 바탕화면으로 이동 (원하는 위치로 변경 가능)</span>
+      <div class="term-body"><span class="g"># 1. 원하는 작업 폴더로 이동 (예: 바탕화면)</span>
 <span class="c">$ cd Desktop</span>
 
-<span class="g"># 2. CCGS 프로젝트 다운로드</span>
-<span class="c">$ git clone https://github.com/bong9tutor/Claude-Code-Game-Studios.git my-game</span>
-<span class="o">Cloning into 'my-game'...</span>
-<span class="o">remote: Enumerating objects: 500, done.</span>
+<span class="g"># 2. 통합 가이드 + CCGS + 샘플 UE 프로젝트 다운로드</span>
+<span class="c">$ git clone https://github.com/bong9tutor/ue-ccgs.git</span>
+<span class="o">Cloning into 'ue-ccgs'...</span>
+<span class="o">remote: Enumerating objects: ..., done.</span>
 <span class="o">... (다운로드 중) ...</span>
 
 <span class="g"># 3. 프로젝트 폴더로 이동</span>
-<span class="c">$ cd my-game</span></div>
+<span class="c">$ cd ue-ccgs</span>
+
+<span class="g"># 4. 폴더 구조 확인</span>
+<span class="c">$ ls</span>
+<span class="o">.claude/  MadeByClaudeCode/  design/  docs/  production/  CLAUDE.md  README.md</span></div>
     </div>
     <div class="info note">
       <span class="info-i">&#x1f4a1;</span>
-      <div><strong>"my-game"</strong>은 프로젝트 폴더 이름입니다. 원하는 이름으로 바꿔도 됩니다. (예: <code>my-rpg-game</code>)</div>
+      <div><strong>자기만의 게임을 만들고 싶다면?</strong><p>이 저장소를 GitHub에서 <strong>Fork</strong>하거나, 클론 후 <code>MadeByClaudeCode/</code> 폴더와 <code>.uproject</code> 파일 이름을 원하는 게임 이름으로 바꿔 사용하세요.</p></div>
     </div>
   </div>
 </div>
 
-<!-- ===== STEP 6: 첫 Claude Code 세션 시작 ===== -->
+<!-- ===== STEP 6: 샘플 UE 프로젝트 열기 ===== -->
 <div class="step">
-  <div class="step-label"><span class="step-num sn-g">6</span><h2>첫 Claude Code 세션 시작하기</h2></div>
+  <div class="step-label"><span class="step-num sn-g">6</span><h2>샘플 UE 프로젝트 열어보기</h2></div>
+
+  <div class="card">
+    <h3>MadeByClaudeCode 프로젝트란?</h3>
+    <p><code>MadeByClaudeCode/</code> 는 가이드 실습을 위한 <strong>UE 5.6 Blank C++ 스켈레톤 프로젝트</strong>입니다. CCGS가 <code>/dev-story</code> 명령어로 코드를 구현할 때 이 프로젝트의 <code>Source/</code> 폴더에 C++ 파일을 생성합니다.</p>
+  </div>
+
+  <div class="card">
+    <h3>프로젝트 열기</h3>
+    <ul class="ck" onclick="event.target.closest('li')?.classList.toggle('on')">
+      <li><span class="cb">&#x2713;</span><span class="ct">파일 탐색기에서 <code>ue-ccgs/MadeByClaudeCode/</code> 폴더로 이동</span></li>
+      <li><span class="cb">&#x2713;</span><span class="ct"><strong><code>MadeByClaudeCode.uproject</code></strong> 파일을 <strong>더블클릭</strong></span></li>
+      <li><span class="cb">&#x2713;</span><span class="ct">"Missing Modules" 창이 뜨면 <strong>"Yes"</strong> 클릭 (C++ 모듈 빌드)</span></li>
+      <li><span class="cb">&#x2713;</span><span class="ct">빌드 완료 후 UE 5.6 에디터가 실행됩니다</span></li>
+    </ul>
+  </div>
+
+  <div class="info tip">
+    <span class="info-i">&#x2705;</span>
+    <div><strong>첫 빌드는 시간이 걸립니다.</strong><p>5~20분 정도 소요될 수 있습니다. 완료 후에는 편집기 테마, 레벨 로드 등이 자동으로 진행됩니다. 빌드 중에는 에디터를 닫지 마세요.</p></div>
+  </div>
+
+  <div class="info note">
+    <span class="info-i">&#x1f4a1;</span>
+    <div><strong>에디터는 지금 바로 닫아도 됩니다.</strong><p>CCGS가 코드를 생성한 후 UE 에디터로 돌아와 컴파일·테스트를 진행하면 됩니다. Part 2~5 진행 중에는 에디터를 닫아둬도 무방합니다.</p></div>
+  </div>
+</div>
+
+<!-- ===== STEP 7: 첫 Claude Code 세션 시작 ===== -->
+<div class="step">
+  <div class="step-label"><span class="step-num sn-g">7</span><h2>첫 Claude Code 세션 시작하기</h2></div>
 
   <div class="card">
     <h3>Claude 세션 시작</h3>
-    <p>프로젝트 폴더(my-game) 안에서 아래 명령어를 입력합니다.</p>
+    <p>프로젝트 루트 폴더(<code>ue-ccgs</code>) 안에서 아래 명령어를 입력합니다. <strong><code>MadeByClaudeCode/</code> 안이 아니라 한 단계 위인 <code>ue-ccgs/</code>에서 실행해야 합니다</strong> — CCGS가 <code>.claude/</code> 폴더를 찾기 때문입니다.</p>
     <div class="term">
       <div class="term-bar"><span class="td td-r"></span><span class="td td-y"></span><span class="td td-g"></span><span class="term-t">terminal &mdash; 첫 세션</span></div>
-      <div class="term-body"><span class="c">$ claude</span>
+      <div class="term-body"><span class="g"># 현재 위치 확인 (ue-ccgs 루트여야 함)</span>
+<span class="c">$ pwd</span>
+<span class="o">/.../Desktop/ue-ccgs</span>
+
+<span class="g"># Claude Code 실행</span>
+<span class="c">$ claude</span>
 
 <span class="w">=== Claude Code Game Studios &mdash; Session Context ===</span>
-<span class="o">Branch: main</span>
+<span class="o">Branch: master</span>
 <span class="o">Recent commits:</span>
-<span class="o">  abc1234 Initial commit</span>
+<span class="o">  ... Integrate CCGS framework into repo root</span>
+<span class="o">  ... Add blank UE 5.6 C++ project (MadeByClaudeCode)</span>
 <span class="w">===================================</span>
 
 <span class="ai">Claude &gt; </span><span class="o">_    &larr; 여기에 명령어를 입력하면 됩니다!</span></div>
@@ -246,7 +299,7 @@
 
   <div class="info warn">
     <span class="info-i">&#x26a0;</span>
-    <div><strong>"Session Context" 메시지가 안 나온다면?</strong><p>다음을 확인하세요: (1) <code>my-game</code> 폴더 안에서 <code>claude</code>를 실행했는지 (2) <code>.claude</code> 폴더가 존재하는지 (<code>ls -la</code>로 확인) (3) API 키가 설정되어 있는지</p></div>
+    <div><strong>"Session Context" 메시지가 안 나온다면?</strong><p>다음을 확인하세요: (1) <code>ue-ccgs</code> 폴더 안에서 <code>claude</code>를 실행했는지 (<code>MadeByClaudeCode/</code> 안이 아님!) (2) <code>.claude</code> 폴더가 존재하는지 (<code>ls -la</code>로 확인) (3) API 키가 설정되어 있는지</p></div>
   </div>
 </div>
 
