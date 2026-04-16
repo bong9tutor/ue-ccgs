@@ -281,25 +281,45 @@
 <span class="g"># Claude Code 실행</span>
 <span class="c">$ claude</span>
 
-<span class="w">=== Claude Code Game Studios &mdash; Session Context ===</span>
-<span class="o">Branch: master</span>
-<span class="o">Recent commits:</span>
-<span class="o">  ... Integrate CCGS framework into repo root</span>
-<span class="o">  ... Add blank UE 5.6 C++ project (MadeByClaudeCode)</span>
-<span class="w">===================================</span>
+<span class="o">  Claude Code v2.1.x</span>
+<span class="o">  Opus 4.x &middot; C:\...\ue-ccgs</span>
 
-<span class="ai">Claude &gt; </span><span class="o">_    &larr; 여기에 명령어를 입력하면 됩니다!</span></div>
+<span class="ai">&gt; </span><span class="o">_</span>
+
+<span class="g"># 화면 하단에 아래와 같은 상태줄이 보이면 CCGS 정상 동작!</span>
+<span class="w">ctx: -- | Opus 4.x | Concept</span></div>
     </div>
   </div>
 
   <div class="info ai">
     <span class="info-i">&#x1f389;</span>
-    <div><strong>축하합니다!</strong><p>위 화면이 나타났다면 CCGS가 정상적으로 작동하고 있습니다! "=== Claude Code Game Studios ===" 메시지는 CCGS의 자동 훅이 세션을 시작하며 표시하는 것입니다. 이제 <strong>Part 2</strong>에서 게임 만들기를 시작합니다.</p></div>
+    <div><strong>CCGS 동작 확인 포인트</strong><p>Claude Code 실행 후 <strong>화면 하단 상태줄</strong>에 <code>Concept</code>, <code>Design</code>, <code>Sprint &#x1f4dd;</code> 같은 단어가 보이면 CCGS의 <code>.claude/statusline.sh</code> 가 정상 작동하는 것입니다. 아직 게임을 만들기 전이므로 기본값인 <strong>Concept</strong> 이 표시됩니다.</p></div>
+  </div>
+
+  <div class="info note">
+    <span class="info-i">&#x1f4a1;</span>
+    <div><strong>세션 시작 배너는 보이지 않습니다</strong><p>CCGS의 <code>session-start.sh</code> 훅은 브랜치·최근 커밋·스프린트 정보를 수집하지만, Claude Code v2.1.x 에서는 이 내용이 <strong>사용자 터미널이 아니라 Claude(AI)의 컨텍스트에만 전달</strong>됩니다. 즉, Claude는 프로젝트 상태를 알고 있지만 화면에는 표시되지 않습니다. 하단 상태줄로 축약 정보가 대신 표시됩니다.</p></div>
+  </div>
+
+  <div class="card">
+    <h3>실제 동작 검증: /start 입력해보기</h3>
+    <p>Claude 프롬프트(<code>&gt; _</code>)에 아래 명령어를 입력해 보세요.</p>
+    <div class="term">
+      <div class="term-bar"><span class="td td-r"></span><span class="td td-y"></span><span class="td td-g"></span><span class="term-t">동작 테스트</span></div>
+      <div class="term-body"><span class="u">나 &gt;</span> <span class="s">/start</span>
+
+<span class="ai">Claude: "Claude Code Game Studios에 오신 것을 환영합니다!</span>
+<span class="ai">        지금 게임 아이디어 관점에서 어디쯤 계신가요?</span>
+<span class="ai">        A) 아이디어가 전혀 없어요</span>
+<span class="ai">        B) 모호한 아이디어가 있어요</span>
+<span class="ai">        ..."</span></div>
+    </div>
+    <p>위와 같이 CCGS <strong>Orchestrator 에이전트</strong>의 응답이 나오면 설치·설정이 모두 완료된 것입니다. 구체적인 사용법은 <strong>Part 2</strong>에서 이어집니다.</p>
   </div>
 
   <div class="info warn">
     <span class="info-i">&#x26a0;</span>
-    <div><strong>"Session Context" 메시지가 안 나온다면?</strong><p>다음을 확인하세요: (1) <code>ue-ccgs</code> 폴더 안에서 <code>claude</code>를 실행했는지 (<code>MadeByClaudeCode/</code> 안이 아님!) (2) <code>.claude</code> 폴더가 존재하는지 (<code>ls -la</code>로 확인) (3) API 키가 설정되어 있는지</p></div>
+    <div><strong>상태줄이 안 보이거나 <code>/start</code>가 인식 안 된다면?</strong><p>다음을 확인하세요: (1) <code>ue-ccgs</code> 폴더 안에서 <code>claude</code>를 실행했는지 (<code>MadeByClaudeCode/</code> 안이 아님!) (2) <code>.claude</code> 폴더가 존재하는지 (<code>ls -la</code>로 확인) (3) API 키가 설정되어 있는지 (4) Claude Code 버전이 v2.1 이상인지 (<code>claude --version</code>)</p></div>
   </div>
 </div>
 
