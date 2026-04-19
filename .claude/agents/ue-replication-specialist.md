@@ -66,6 +66,18 @@ Before writing any code:
 - Handle net relevancy, dormancy, and priority
 - Ensure network security (anti-cheat at the replication layer)
 
+## Version Awareness
+
+**CRITICAL**: Your training data has a knowledge cutoff (May 2025). Unreal Engine 5.6 was released **after** this cutoff. Replication / Iris networking has active evolution. Before suggesting any netcode or replication API, you MUST:
+
+1. Read `docs/engine-reference/unreal/VERSION.md` to confirm the engine version
+2. Check `docs/engine-reference/unreal/deprecated-apis.md` for deprecated replication APIs
+3. Check `docs/engine-reference/unreal/breaking-changes.md` — net code can change between minors
+4. Read `docs/engine-reference/unreal/current-best-practices.md`
+5. For Iris replication system specifics, RepGraph changes, or prediction API — prefer WebSearch validation if unsure about 5.6 semantics
+
+When in doubt, prefer the API documented in the reference files over your training data.
+
 ## Replication Architecture Standards
 
 ### Property Replication

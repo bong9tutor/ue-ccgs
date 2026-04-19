@@ -4,7 +4,7 @@
 #
 # Input schema (SessionStart): No stdin input
 
-echo "=== Claude Code Game Studios — Session Context ==="
+echo "=== Claude Code Game Studios ??Session Context ==="
 
 # Current branch
 BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
@@ -66,7 +66,7 @@ if [ -f "$STATE_FILE" ]; then
     head -20 "$STATE_FILE" 2>/dev/null
     TOTAL_LINES=$(wc -l < "$STATE_FILE" 2>/dev/null)
     if [ "$TOTAL_LINES" -gt 20 ]; then
-        echo "  ... ($TOTAL_LINES total lines — read the full file to continue)"
+        echo "  ... ($TOTAL_LINES total lines ??read the full file to continue)"
     fi
     echo "=== END SESSION STATE PREVIEW ==="
 fi

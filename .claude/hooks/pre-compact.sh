@@ -14,7 +14,7 @@ if [ -f "$STATE_FILE" ]; then
     STATE_LINES=$(wc -l < "$STATE_FILE" 2>/dev/null | tr -d ' ')
     if [ "$STATE_LINES" -gt 100 ] 2>/dev/null; then
         head -n 100 "$STATE_FILE"
-        echo "... (truncated — $STATE_LINES total lines, showing first 100)"
+        echo "... (truncated ??$STATE_LINES total lines, showing first 100)"
     else
         cat "$STATE_FILE"
     fi
@@ -50,7 +50,7 @@ fi
 
 # --- Work-in-progress design docs ---
 echo ""
-echo "## Design Docs — Work In Progress"
+echo "## Design Docs ??Work In Progress"
 
 WIP_FOUND=false
 for f in design/gdd/*.md; do

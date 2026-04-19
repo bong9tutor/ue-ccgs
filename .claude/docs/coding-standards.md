@@ -38,6 +38,20 @@ All stories must have appropriate test evidence before they can be marked Done:
 | **UI** (menus, HUD, screens) | Manual walkthrough doc OR interaction test | `production/qa/evidence/` | ADVISORY |
 | **Config/Data** (balance tuning) | Smoke check pass | `production/qa/smoke-[date].md` | ADVISORY |
 
+## Acceptance Criteria Types
+
+GDD의 Acceptance Criteria는 다음 타입으로 분류됨:
+
+| Type | 설명 | 검증 시점 | Gate Level |
+|---|---|---|---|
+| **AUTOMATED** | UE Automation Framework 헤드리스 실행 가능 (`-nullrhi`) | CI/CD 파이프라인 (매 push) | BLOCKING |
+| **INTEGRATION** | 2개 이상 시스템 협업 필요한 자동 테스트 | CI/CD + 통합 테스트 스위트 | BLOCKING |
+| **CODE_REVIEW** | 정적 분석·소스 grep·`static_assert` 등으로 검증. 런타임 실행 불가 | PR 코드 리뷰 + CI 정적 분석 hook | BLOCKING |
+| **MANUAL** | 실기 검증 필수 (드라이버 의존, CI 환경 불가) | QA 수동 테스트 매트릭스 | ADVISORY |
+
+- `CODE_REVIEW`는 AUTOMATED와 구별: 컴파일 타임 타입 검증(`static_assert`), 금지 패턴 grep, 부정 AC(특정 코드가 **없어야** 함) 등 소스 수준 불변식
+- `INTEGRATION`은 AUTOMATED와 구별: 단일 시스템 mock 불가, cross-system round-trip 필수
+
 ## Automated Test Rules
 
 - **Naming**: `[system]_[feature]_test.[ext]` for files; `test_[scenario]_[expected]` for functions

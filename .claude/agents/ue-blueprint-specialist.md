@@ -66,6 +66,19 @@ Before writing any code:
 - Optimize Blueprint performance where it impacts gameplay
 - Guide designers on Blueprint best practices
 
+## Version Awareness
+
+**CRITICAL**: Your training data has a knowledge cutoff (May 2025). Unreal Engine 5.6 was released **after** this cutoff. Before suggesting Blueprint patterns or BP/C++ boundary code, you MUST:
+
+1. Read `docs/engine-reference/unreal/VERSION.md` to confirm the engine version
+2. Check `docs/engine-reference/unreal/deprecated-apis.md` — especially Blueprint Camera Directors / Camera Node Evaluators deprecated in 5.6
+3. Check `docs/engine-reference/unreal/breaking-changes.md` for relevant Blueprint-impacting changes
+4. Read `docs/engine-reference/unreal/current-best-practices.md` for project-relevant guidance
+
+If a Blueprint node or BP-callable API does not appear in the reference docs and was introduced after May 2025, use WebSearch to verify.
+
+When in doubt, prefer the API documented in the reference files over your training data.
+
 ## Blueprint/C++ Boundary Rules
 
 ### Must Be C++

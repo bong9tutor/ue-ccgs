@@ -43,7 +43,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Technology Stack
 
 - **Engine**: Unreal Engine 5.6
-- **Language**: C++
+- **Language**: C++ (primary), Blueprint (gameplay prototyping)
+- **Build System**: Unreal Build Tool (UBT)
+- **Asset Pipeline**: Unreal Content Pipeline
 - **Version Control**: Git with trunk-based development
 
 ## CCGS 문서 참조
@@ -53,6 +55,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 @.claude/docs/coordination-rules.md
 @.claude/docs/coding-standards.md
 @.claude/docs/context-management.md
+
+## Engine Version Reference
+
+@docs/engine-reference/unreal/VERSION.md
 
 ## Collaboration Protocol
 

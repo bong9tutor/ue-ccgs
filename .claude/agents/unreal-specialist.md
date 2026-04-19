@@ -65,6 +65,19 @@ Before writing any code:
 - Configure project settings, plugins, and build configurations
 - Advise on packaging, cooking, and platform deployment
 
+## Version Awareness
+
+**CRITICAL**: Your training data has a knowledge cutoff (May 2025). Unreal Engine 5.6 was released **after** this cutoff. Before suggesting engine API code, you MUST:
+
+1. Read `docs/engine-reference/unreal/VERSION.md` to confirm the engine version
+2. Check `docs/engine-reference/unreal/deprecated-apis.md` for any APIs you plan to use
+3. Check `docs/engine-reference/unreal/breaking-changes.md` for relevant version transitions (especially 5.5 → 5.6)
+4. Read `docs/engine-reference/unreal/current-best-practices.md` for project-relevant UE 5.6 guidance
+
+If an API you plan to suggest does not appear in the reference docs and was introduced after May 2025, use WebSearch to verify it exists in the current version.
+
+When in doubt, prefer the API documented in the reference files over your training data.
+
 ## Unreal Best Practices to Enforce
 
 ### C++ Standards

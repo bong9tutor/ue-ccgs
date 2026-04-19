@@ -1,0 +1,141 @@
+name: Automated Tests (UE 5.6 Automation Framework)
+
+# --------------------------------------------------------------------------
+# Moss Baby — CI test workflow
+#
+# ⚠️  Self-hosted runner 필요:
+#   UE 5.6 Editor (약 80-100GB)가 설치된 Windows/Linux 머신
+#   GitHub-hosted runner로는 UE 테스트 불가 (engine 설치 불가)
+#
+# 설정 가이드:
+#   1. Self-hosted runner 등록: Repo Settings → Actions → Runners → New self-hosted runner
+#   2. Runner 머신에 UE 5.6 설치 + UnrealEditor-Cmd 실행 가능 확인
+#   3. 환경 변수 UE_EDITOR_PATH 설정 (예: C:/Program Files/Epic Games/UE_5.6/Engine/Binaries/Win64)
+#
+# 현재 상태 (2026-04-19): Self-hosted runner 미설정. 이 workflow는 placeholder.
+#   Local 수동 실행: tests/README.md §헤드리스 섹션 참조.
+#   Production 단계 진입 시 self-hosted runner 구성 권장.
+# --------------------------------------------------------------------------
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'MadeByClaudeCode/Source/**'
+      - 'MadeByClaudeCode/Content/Data/**'
+      - 'MadeByClaudeCode/Config/**'
+      - 'MadeByClaudeCode/MadeByClaudeCode.uproject'
+      - '.github/workflows/tests.yml'
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  ue-automation-tests:
+    name: UE Automation Tests — Moss Baby
+    runs-on: self-hosted  # ⚠️ self-hosted runner 필수
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+          submodules: recursive
+
+      - name: Verify UE Editor
+        shell: bash
+        run: |
+          if [ -z "$UE_EDITOR_PATH" ]; then
+            echo "::error::UE_EDITOR_PATH 환경 변수 미설정 — self-hosted runner에서 UE 5.6 설치 경로 설정 필요"
+            exit 1
+          fi
+          if [ ! -x "$UE_EDITOR_PATH/UnrealEditor-Cmd.exe" ]; then
+            echo "::error::UnrealEditor-Cmd를 찾을 수 없음: $UE_EDITOR_PATH"
+            exit 1
+          fi
+
+      - name: Run MossBaby Automation Tests
+        shell: bash
+        run: |
+          "$UE_EDITOR_PATH/UnrealEditor-Cmd.exe" \
+            "${{ github.workspace }}/MadeByClaudeCode/MadeByClaudeCode.uproject" \
+            -ExecCmds="Automation RunTests MossBaby.; Quit" \
+            -nullrhi -nosound \
+            -log -unattended \
+            -Buildmachine \
+            -stdout -AllowStdOutLogVerbosity
+        env:
+          UE_PROJECT_NAME: MadeByClaudeCode
+
+      - name: Upload Test Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ue-test-logs-${{ github.run_number }}
+          path: |
+            MadeByClaudeCode/Saved/Logs/
+            MadeByClaudeCode/Saved/Automation/
+          retention-days: 7
+
+      - name: Check Test Results
+        if: always()
+        shell: bash
+        run: |
+          LOG_FILE="MadeByClaudeCode/Saved/Logs/MadeByClaudeCode.log"
+          if [ -f "$LOG_FILE" ]; then
+            if grep -q "Test Completed. Result={Failed}" "$LOG_FILE"; then
+              echo "::error::UE Automation tests 실패 — 로그 확인: MadeByClaudeCode/Saved/Logs/"
+              exit 1
+            fi
+            echo "UE Automation tests 통과"
+          else
+            echo "::warning::테스트 로그 파일 없음: $LOG_FILE"
+          fi
+
+  # 정적 분석 hook (현재는 placeholder — ADR Accepted 후 활성화)
+  static-analysis:
+    name: Static Analysis — ADR 정책 강제
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: ADR-0001 Forward Tamper 탐지 금지
+        shell: bash
+        run: |
+          set -e
+          MATCHES=$(grep -rE "tamper|DetectClockSkew|bIsForward|bIsSuspicious|IsSuspiciousAdvance" \
+            MadeByClaudeCode/Source/ 2>/dev/null || true)
+          if [ -n "$MATCHES" ]; then
+            echo "::error::ADR-0001 위반 — Forward Tamper 탐지 패턴 발견:"
+            echo "$MATCHES"
+            exit 1
+          fi
+          echo "ADR-0001 통과"
+
+      - name: ADR-0011 UDeveloperSettings naming convention
+        shell: bash
+        run: |
+          # UDeveloperSettings subclass는 U[SystemName]Settings 패턴
+          # UDeveloperSettings 상속 없이 "Settings" suffix 사용하는 class 탐지 (향후 ADR 구현 후 활성화)
+          echo "ADR-0011 static analysis — placeholder (ADR 구현 후 활성화)"
+
+      - name: Hover-only prohibition (Input Abstraction Rule 4)
+        shell: bash
+        run: |
+          # Hover-only로 게임 상태 변경하는 패턴 탐지 — UMG에서 OnMouseEnter로 직접 상태 변경
+          # AC HOVER_ONLY_PROHIBITION 강제 (수동 검토 + 자동 grep 조합)
+          echo "Hover-only prohibition — placeholder (Implementation 단계 활성화)"
+
+      - name: C1 schema gate (FGiftCardRow 수치 필드 금지)
+        shell: bash
+        run: |
+          # FGiftCardRow에 int32/float/double 수치 효과 필드 정의 금지 (Pipeline C1)
+          if [ -f "MadeByClaudeCode/Source/MadeByClaudeCode/Data/GiftCardRow.h" ]; then
+            NUM_FIELDS=$(grep -E "(int32|float|double)\s+\w+\s*(;|=)" \
+              MadeByClaudeCode/Source/MadeByClaudeCode/Data/GiftCardRow.h || true)
+            if [ -n "$NUM_FIELDS" ]; then
+              echo "::warning::FGiftCardRow 수치 필드 발견 — C1 schema gate 검토 필요:"
+              echo "$NUM_FIELDS"
+            fi
+          fi
+          echo "C1 schema gate — placeholder (Foundation sprint 후 활성화)"

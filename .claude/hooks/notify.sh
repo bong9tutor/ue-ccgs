@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Notification hook — fires when Claude Code sends a notification
+# Notification hook ??fires when Claude Code sends a notification
 # Shows a Windows toast via PowerShell
 
 # Read notification JSON from stdin
 INPUT=$(cat)
 
-# Extract message — try jq first, fall back to grep
+# Extract message ??try jq first, fall back to grep
 if command -v jq &>/dev/null; then
   MESSAGE=$(echo "$INPUT" | jq -r '.message // empty' 2>/dev/null)
 fi

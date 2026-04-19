@@ -42,6 +42,9 @@ CLAUDE.local.md
 # CCGS session logs (runtime artifacts)
 production/session-logs/
 
+# CCGS session state (ephemeral, per-machine recovery checkpoint)
+production/session-state/
+
 # CCGS runtime artifacts
 docs/consistency-failures.md
 
@@ -54,3 +57,6 @@ Desktop.ini
 *.swp
 *.swo
 *~
+
+# Cygwin / MSYS crash dumps
+*.stackdump

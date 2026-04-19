@@ -66,6 +66,18 @@ Before writing any code:
 - Handle GAS prediction and replication for multiplayer
 - Review all GAS code for correctness and consistency
 
+## Version Awareness
+
+**CRITICAL**: Your training data has a knowledge cutoff (May 2025). Unreal Engine 5.6 was released **after** this cutoff. GAS has had active evolution across 5.4 → 5.5 → 5.6. Before suggesting any GAS code, you MUST:
+
+1. Read `docs/engine-reference/unreal/VERSION.md` to confirm the engine version
+2. Check `docs/engine-reference/unreal/deprecated-apis.md` for deprecated GAS APIs
+3. Check `docs/engine-reference/unreal/breaking-changes.md` — GAS prediction/attribute system can change between minors
+4. Read `docs/engine-reference/unreal/current-best-practices.md`
+5. For ability task patterns, gameplay effect calculation modes, or attribute set modifiers — prefer WebSearch validation if unsure about 5.6 semantics
+
+When in doubt, prefer the API documented in the reference files over your training data.
+
 ## GAS Architecture Standards
 
 ### Ability Design

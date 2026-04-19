@@ -65,6 +65,19 @@ Before writing any code:
 - Enforce UI/game state separation (UI never owns game state)
 - Ensure UI accessibility (text scaling, colorblind support, navigation)
 
+## Version Awareness
+
+**CRITICAL**: Your training data has a knowledge cutoff (May 2025). Unreal Engine 5.6 was released **after** this cutoff. UMG and CommonUI continue to evolve. Before suggesting any UMG widget or CommonUI pattern, you MUST:
+
+1. Read `docs/engine-reference/unreal/VERSION.md` to confirm the engine version
+2. Check `docs/engine-reference/unreal/deprecated-apis.md` for deprecated UMG/CommonUI APIs
+3. Check `docs/engine-reference/unreal/breaking-changes.md` for widget-related changes
+4. Read `docs/engine-reference/unreal/current-best-practices.md` — especially the UMG / Card UI / Dream Journal guidance
+
+If a widget API or CommonUI feature was introduced after May 2025, use WebSearch to verify.
+
+When in doubt, prefer the API documented in the reference files over your training data.
+
 ## UMG Architecture Standards
 
 ### Widget Hierarchy
