@@ -3,16 +3,17 @@
 // MossSaveLoadSubsystem.h — Save/Load Persistence 메인 서브시스템 선언
 //
 // Story 1-8: UMossSaveLoadSubsystem 뼈대 + 4-trigger lifecycle (T1/T2/T3/T4) + coalesce 정책
+// Story 1-9: LoadInitial / ReadSlot / ComputeNextWSN / GetSlotPath API + ActiveSlot 멤버
 // ADR-0009: per-trigger atomicity + coalesce (sequence-level API 금지 — GSM 책임)
-// GDD: design/gdd/save-load-persistence.md §Core Rules 5 + §States
+// GDD: design/gdd/save-load-persistence.md §Core Rules 5 + §States + §Formula 1-3
 //
 // 5-state 머신 (GDD §States):
 //   Idle → Saving (SaveAsync 정상 진입)
-//   Idle → Loading (Story 1-9 실제 로드 구현 시 전이)
-//   Loading → Migrating (Story 1-9 마이그레이션 체인 시 전이)
+//   Idle → Loading (LoadInitial 진입 시)
+//   Loading → Migrating (마이그레이션 체인 진입 시)
 //   Loading/Migrating → Idle (로드/마이그레이션 완료)
 //   Saving → Idle (저장 완료, OnSaveTaskComplete)
-//   FreshStart: 최초 실행 — Story 1-9에서 사용
+//   FreshStart: 최초 실행 — 양 슬롯 부재 또는 양 슬롯 Invalid 시
 //
 // 4-trigger lifecycle:
 //   T1: UGameViewportClient::CloseRequested(UWorld*) → FlushAndDeinit()
@@ -31,7 +32,6 @@
 //   Compound event sequence atomicity = GSM BeginCompoundEvent/EndCompoundEvent 책임
 //
 // Story 1-8 Out of Scope:
-//   - Header block + CRC32 (Story 1-9)
 //   - Atomic write + dual-slot (Story 1-10)
 //   - T1 GameViewport World* 실제 바인딩 (Story 1-20 또는 게임 코드)
 //   - AC E23 TFuture 실제 대기 (Story 1-10)
@@ -41,6 +41,7 @@
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "HAL/ThreadSafeBool.h"
 #include "SaveLoad/MossSaveData.h"
+#include "SaveLoad/MossSaveHeader.h"
 #include "MossSaveLoadSubsystem.generated.h"
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -120,11 +121,11 @@ public:
 
     /**
      * 서브시스템 초기화.
-     *   - UMossSaveData 인스턴스 생성 (실제 디스크 로드는 Story 1-9)
+     *   - UMossSaveData 인스턴스 생성
      *   - T2 Slate activation delegate 등록 (nullrhi 가드 포함)
      *   - T3 CoreDelegates::OnExit 등록
      *   - State = Idle 설정
-     *   - OnLoadComplete.Broadcast(bFreshStart=true, bHadPreviousData=false) (뼈대)
+     *   - LoadInitial() 호출 → 디스크 로드 또는 FreshStart 분기
      */
     virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 
@@ -135,6 +136,47 @@ public:
      *   - SaveData = nullptr 후 Super::Deinitialize()
      */
     virtual void Deinitialize() override;
+
+    // ── Load API (Story 1-9) ──────────────────────────────────────────────────
+
+    /**
+     * 초기 로드 수행 (Initialize에서 호출).
+     *
+     * Formula 1 (argmax WSN ∩ Valid): 양 슬롯 중 WSN이 높고 유효한 슬롯 선택.
+     * 양 슬롯 부재 → FreshStart(bHadPreviousData=false).
+     * 양 슬롯 Invalid → FreshStart(bHadPreviousData=true) + fallback 재귀 차단(FallbackRecursionCount ≤ 1).
+     * LoadGameFromMemory 실패 시 다른 슬롯으로 1회 fallback.
+     * Schema 버전 < CURRENT → State=Migrating. == CURRENT → State=Idle.
+     */
+    void LoadInitial();
+
+    /**
+     * 다음 WSN 계산 (Formula 2).
+     *
+     * NextWSN = max(A.WSN, B.WSN) + 1.
+     * uint32 overflow 시 UE_LOG Error + return 1 (wrap detection).
+     * public: 테스트 가시성 및 SaveAsync write 경로에서 호출.
+     *
+     * @return 다음 쓰기 시퀀스 번호
+     */
+    uint32 ComputeNextWSN() const;
+
+    /**
+     * 슬롯 파일 경로 생성 (FPlatformProcess::UserSettingsDir() 기반).
+     *
+     * 경로 형식: [UserSettingsDir]/MossBaby/SaveGames/MossData_[SlotLetter].sav
+     * public: 테스트 + SaveAsync write 경로에서 호출.
+     *
+     * @param SlotLetter  'A' 또는 'B'
+     * @return            플랫폼 경로 문자열
+     */
+    static FString GetSlotPath(TCHAR SlotLetter);
+
+    /**
+     * 현재 활성 슬롯 반환 ('A' 또는 'B').
+     * 다음 SaveAsync가 쓸 슬롯. LoadInitial 이후 결정됨.
+     */
+    TCHAR GetActiveSlot() const { return ActiveSlot; }
 
     // ── Public API ────────────────────────────────────────────────────────────
 
@@ -228,9 +270,41 @@ public:
      * 프로덕션 코드에서 절대 호출 금지.
      */
     void TestingResetIOCommitCount() { IOCommitCount = 0; }
+
+    /**
+     * [테스트 전용] ActiveSlot 강제 설정.
+     * 슬롯 선택 로직 우회용.
+     * 프로덕션 코드에서 절대 호출 금지.
+     */
+    void TestingSetActiveSlot(TCHAR Slot) { ActiveSlot = Slot; }
+
+    /**
+     * [테스트 전용] ReadSlot 직접 호출.
+     * 단일 슬롯 유효성 검증 경로 테스트용.
+     * 프로덕션 코드에서 절대 호출 금지.
+     */
+    bool TestingReadSlot(const FString& Path, FMossSaveHeader& OutHeader, TArray<uint8>& OutPayload) const
+    {
+        return ReadSlot(Path, OutHeader, OutPayload);
+    }
 #endif
 
 private:
+    // ── Load Helpers (Story 1-9) ──────────────────────────────────────────────
+
+    /**
+     * 단일 슬롯 파일 읽기 + 6-condition 유효성 검증 (Formula 3).
+     *
+     * Short-circuit 순서: IOError → Exists → Size → Magic → Schema → PayloadLen → CRC32.
+     * 각 실패 조건에서 UE_LOG Warning 발행 후 false 반환.
+     *
+     * @param Path        슬롯 파일 절대 경로
+     * @param OutHeader   성공 시 읽은 헤더 출력
+     * @param OutPayload  성공 시 payload(헤더 이후 바이트) 출력
+     * @return            6조건 모두 통과 시 true
+     */
+    bool ReadSlot(const FString& Path, FMossSaveHeader& OutHeader, TArray<uint8>& OutPayload) const;
+
     // ── Trigger Handlers ──────────────────────────────────────────────────────
 
     /**
@@ -280,6 +354,20 @@ private:
 
     /** 현재 5-state machine 상태. 초기값 Idle. */
     ESaveLoadState State = ESaveLoadState::Idle;
+
+    /**
+     * 현재 활성 슬롯 ('A' 또는 'B').
+     * LoadInitial에서 결정. 다음 SaveAsync(Story 1-10)가 쓸 슬롯.
+     * FreshStart 시 'A' (첫 쓰기가 A에 WSN=1).
+     */
+    TCHAR ActiveSlot = 'A';
+
+    /**
+     * LoadInitial fallback 재귀 차단 카운터.
+     * LoadGameFromMemory 실패 후 다른 슬롯 fallback 횟수 ≤ 1 보장 (E10/E11).
+     * 0=미시도, 1=fallback 1회 실행됨 — 이후 FreshStart 강제.
+     */
+    int32 FallbackRecursionCount = 0;
 
     /**
      * 게임 전체 영속 데이터 컨테이너.

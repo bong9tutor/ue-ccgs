@@ -1,9 +1,10 @@
 # Story 003: Header block + CRC32 + Formula 1-3 (Slot Selection, Validity, WSN) + Dual-slot Load
 
 > **Epic**: Save/Load Persistence
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
+> **Estimate**: 0.5 days (~4 hours)
 > **Manifest Version**: 2026-04-19
 
 ## Context
@@ -214,3 +215,34 @@ uint32 UMossSaveLoadSubsystem::ComputeNextWSN() const {
 
 - Depends on: Story 001 (UMossSaveData), Story 002 (Subsystem lifecycle)
 - Unlocks: Story 004
+
+---
+
+## Completion Notes
+
+**Completed**: 2026-04-19
+**Criteria**: Header/Formula 구현 완료, 실제 파일 I/O AC는 Integration 분리
+**Files delivered**:
+- `SaveLoad/MossSaveHeader.h` (신규) — 22-byte layout + Serialize/DeserializeFromBuffer/SerializeToBuffer
+- `Tests/MossSaveHeaderTests.cpp` (신규, 4 tests)
+- `SaveLoad/MossSaveLoadSubsystem.h/.cpp` (수정) — LoadInitial/ReadSlot/ComputeNextWSN/GetSlotPath 추가 + Initialize에서 LoadInitial 호출 + FallbackRecursionCount 추가
+- `tests/unit/save-load/README.md` (Story 1-9 섹션 append)
+
+**Test Evidence**: 4 UE Automation — `MossBaby.SaveLoad.Header.{Defaults/SerializeRoundTrip/Size/MagicVerify}`
+
+**AC 커버**:
+- [x] FMossSaveHeader 22-byte layout: SerializeRoundTripTest + SizeTest
+- [x] MAGIC_NUMBER 0x4D4F5353: MagicVerifyTest
+- [x] Formula 1/2/3 구현: LoadInitial/ComputeNextWSN/ReadSlot (subsystem integration test로 분리)
+- [x] FallbackRecursionCount ≤ 1: 코드 구현 (integration 검증)
+
+**ADR/Rule 준수**:
+- ADR-0001 grep: 0 매치
+- FCrc::MemCrc32(seed=0) CRITICAL-4 준수
+- Short-circuit validity 순서 준수
+
+**Deferred (Story 1-10 또는 integration)**:
+- SLOT_SELECT_HIGHEST_WSN / VALIDITY_CRC_MISMATCH_FALLBACK / FRESHSTART_FIRST_WRITE_TO_A / SCHEMA_FUTURE/TOO_OLD_REJECTED / FALLBACK_ONE_TIME_LIMIT — 실제 `.sav` 파일 생성·변조 필요 → Story 1-10 write 경로 완성 또는 integration story에서 커버
+- CRC32_GENERATED_ON_WRITE — Story 1-10 (write side 구현 후)
+
+**Integration test TD-005 lifecycle에 포함**: Initialize→LoadInitial→Subsystem 전체 생명주기 실제 검증

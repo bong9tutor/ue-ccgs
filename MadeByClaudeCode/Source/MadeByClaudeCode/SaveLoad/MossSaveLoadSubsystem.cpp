@@ -3,25 +3,29 @@
 // MossSaveLoadSubsystem.cpp — Save/Load Persistence 메인 서브시스템 구현
 //
 // Story 1-8: UMossSaveLoadSubsystem 뼈대 + 4-trigger lifecycle (T1/T2/T3/T4) + coalesce 정책
+// Story 1-9: LoadInitial / ReadSlot / ComputeNextWSN / GetSlotPath 구현
 // ADR-0009: per-trigger atomicity (sequence-level API 금지 — GSM 책임)
-// GDD: design/gdd/save-load-persistence.md §Core Rules 5 + §States
+// GDD: design/gdd/save-load-persistence.md §Core Rules 5 + §States + §Formula 1-3
 //
-// 뼈대 구현 범위:
-//   - Initialize: SaveData NewObject, delegate 등록, OnLoadComplete Broadcast (bFreshStart=true)
+// 구현 범위:
+//   - Initialize: SaveData NewObject, delegate 등록, LoadInitial() 호출
 //   - Deinitialize: delegate Remove (정확한 핸들), T4 FlushAndDeinit
 //   - SaveAsync: state-based coalesce/drop 로직 + IOCommitCount (동기 시뮬레이션)
 //   - FlushOnly (T2): Idle 시 SaveAsync 1회
 //   - FlushAndDeinit (T1/T3/T4): FThreadSafeBool 재진입 차단 + pending commit
 //   - OnSaveTaskComplete: Idle 복귀 + pending coalesced save 처리
+//   - LoadInitial: dual-slot 로드 + Formula 1 (argmax WSN ∩ Valid) + FreshStart 분기
+//   - ReadSlot: Formula 3 6-condition short-circuit 유효성 검증
+//   - ComputeNextWSN: Formula 2 max+1 + wrap detection
+//   - GetSlotPath: 플랫폼 경로 생성
 //
 // Deferred (Story 1-10):
 //   - 실제 worker thread TFuture 위임
 //   - TFuture::WaitFor timeout (AC E23)
-//   - Atomic write + dual-slot (AC Header CRC)
+//   - Atomic write + dual-slot write (CRC 생성 포함)
 //
-// Deferred (Story 1-9):
-//   - 실제 디스크 로드 + 마이그레이션 체인
-//   - FreshStart 분기
+// Deferred (Story 1-16):
+//   - Migration chain (Formula 4)
 //
 // Deferred (Story 1-20 또는 게임 코드):
 //   - T1 UGameViewportClient::CloseRequested UWorld* 실제 바인딩
@@ -30,6 +34,11 @@
 #include "Settings/MossSaveLoadSettings.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Misc/CoreDelegates.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#include "HAL/PlatformProcess.h"
+#include "Misc/Crc.h"
+#include "Kismet/GameplayStatics.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogMossSaveLoad, Log, All);
 
