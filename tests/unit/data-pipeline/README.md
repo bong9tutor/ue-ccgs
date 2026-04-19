@@ -201,3 +201,76 @@ TD-005 lifecycle integration story에 포함 예정.
 - ADR-0003: Data Pipeline 로딩 전략 — Sync 일괄 로드 채택 (4단계 순서 + DegradedFallback 정책)
 - ADR-0002: Data Pipeline 컨테이너 선택 (C1/C2 schema gate)
 - ADR-0010: FFinalFormRow 저장 형식 — FMossFinalFormData read-only view (FromAsset 변환)
+
+---
+
+## Story 1-19 — T_init Budget + 3-단계 Overflow Threshold
+
+### 실제 테스트 파일
+
+```
+MadeByClaudeCode/Source/MadeByClaudeCode/Tests/DataPipelineBudgetTests.cpp
+```
+
+### 카테고리
+
+```
+MossBaby.Data.Pipeline.Budget.*
+```
+
+### 헤드리스 실행 명령
+
+```bash
+UnrealEditor-Cmd.exe MadeByClaudeCode.uproject \
+  -ExecCmds="Automation RunTests MossBaby.Data.Pipeline.Budget.; Quit" \
+  -nullrhi -nosound -log -unattended
+```
+
+### AC 매핑
+
+| Automation Test | AC | 타입 | Gate |
+|---|---|---|---|
+| `MossBaby.Data.Pipeline.Budget.TInitNormal` | AC-DP-09 (30ms → Normal, flag 미설정) | AUTOMATED | BLOCKING |
+| `MossBaby.Data.Pipeline.Budget.TInitWarning` | AC-DP-09 (52.6ms → Warning flag) | AUTOMATED | BLOCKING |
+| `MossBaby.Data.Pipeline.Budget.TInitError` | AC-DP-09 (76ms → Error flag, else-if 분기 확인) | AUTOMATED | BLOCKING |
+| `MossBaby.Data.Pipeline.Budget.TInitFatal` | AC-DP-09 (101ms → Fatal flag) | AUTOMATED | BLOCKING |
+| `MossBaby.Data.Pipeline.Budget.CatalogCardWarn` | AC-DP-10 (Card 210 >= 200×1.05 → Warn) | AUTOMATED | BLOCKING |
+| `MossBaby.Data.Pipeline.Budget.CatalogCardError` | AC-DP-10 (Card 301 >= 200×1.5 → Error) | AUTOMATED | BLOCKING |
+| `MossBaby.Data.Pipeline.Budget.CatalogCardFatal` | AC-DP-10 (Card 401 >= 200×2.0 → Fatal) | AUTOMATED | BLOCKING |
+| `MossBaby.Data.Pipeline.Budget.GetCatalogStatsFormat` | AC-DP-08 (빈 카탈로그 Stats 포맷 검증) | AUTOMATED | BLOCKING |
+
+### Fatal 로그 처리 방침
+
+UE_LOG Fatal은 process 종료 유발 → test harness crash 방지를 위해 **Error 로그 + `[FATAL_THRESHOLD]` 접두어 + `bInitFatalTriggered = true`** 조합으로 구현.
+
+Shipping 빌드에서 `checkf` 강제 강화는 **TD-013** (future, Story 1-20 후보).
+
+### 테스트 값 근거 (CDO default 기준)
+
+| Settings 필드 | 기본값 |
+|---|---|
+| MaxInitTimeBudgetMs | 50.0ms |
+| MaxCatalogSizeCards | 200 |
+| CatalogOverflowWarnMultiplier | 1.05 |
+| CatalogOverflowErrorMultiplier | 1.5 |
+| CatalogOverflowFatalMultiplier | 2.0 |
+
+T_init Warn threshold = 50 × 1.05 = 52.5ms → 테스트에서 52.6ms 사용.
+Card Error threshold = 200 × 1.5 = 300 → 테스트에서 301 사용.
+
+### [5.6-VERIFY] 항목
+
+AC-DP-09/10 실측 10회 반복 및 p95 측정은 **release-gate MANUAL test** (별도 분리).
+
+### 수정 파일
+
+| 파일 | 역할 |
+|---|---|
+| `MadeByClaudeCode/Source/MadeByClaudeCode/Data/DataPipelineSubsystem.h` | CheckCatalogSize / EvaluateTInitBudget / GetCatalogStats 선언 + Budget flag 멤버 + 테스트 훅 |
+| `MadeByClaudeCode/Source/MadeByClaudeCode/Data/DataPipelineSubsystem.cpp` | Initialize 3-단계 분기 + CheckCatalogSize + EvaluateTInitBudget + GetCatalogStats 구현 |
+| `MadeByClaudeCode/Source/MadeByClaudeCode/Tests/DataPipelineBudgetTests.cpp` | UE Automation 테스트 8개 (신규) |
+
+### 관련 ADR
+
+- ADR-0003: Data Pipeline 로딩 전략 — T_init 성능 예산 §T_init 성능 예산
+- ADR-0011: Tuning Knob 노출 방식 — UMossDataPipelineSettings CDO default 값 근거

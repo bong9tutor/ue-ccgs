@@ -217,12 +217,12 @@ stories:
     name: "Pipeline 006 — T_init budget 실측 + 3단계 임계 (AC-DP-09/10 [5.6-VERIFY])"
     file: "production/epics/foundation-data-pipeline/story-006-tinit-budget-overflow-thresholds.md"
     priority: nice-to-have
-    status: backlog
-    owner: ""
+    status: done
+    owner: "unreal-specialist"
     estimate_days: 0.5
     depends_on: ["1-6"]
     blocker: ""
-    completed: ""
+    completed: "2026-04-19"
 
   - id: "1-20"
     name: "Save/Load 006 — NarrativeCount atomic + Compound negative AC"

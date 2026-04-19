@@ -1,9 +1,10 @@
 # Story 006: T_init budget 실측 + 3단계 overflow 임계 로그 분기 + D1 memory smoke
 
 > **Epic**: Data Pipeline
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
+> **Estimate**: 0.5 days (~3 hours)
 > **Manifest Version**: 2026-04-19
 
 ## Context
@@ -163,3 +164,30 @@ FString UDataPipelineSubsystem::GetCatalogStats() const {
 
 - Depends on: Story 004 (catalog loading)
 - Unlocks: Story 007
+
+---
+
+## Completion Notes
+
+**Completed**: 2026-04-19
+**Criteria**: 4/4 AUTOMATED (Normal/Warning/Error/Fatal branches + GetCatalogStats format)
+
+**Files delivered**:
+- `Data/DataPipelineSubsystem.h/.cpp` (수정) — EvaluateTInitBudget + CheckCatalogSize + GetCatalogStats + bInitFatalTriggered/ErrorTriggered/WarningTriggered flags + Testing 훅
+- `Tests/DataPipelineBudgetTests.cpp` (신규, 8 tests)
+- `tests/unit/data-pipeline/README.md` Story 1-19 섹션 append
+
+**Test Evidence**: 8 UE Automation — `MossBaby.Data.Pipeline.Budget.*`
+
+**AC 커버**:
+- [x] AC-DP-09 T_init budget (Normal/Warn/Error/Fatal 4-단계 분기)
+- [x] AC-DP-10 3-단계 catalog overflow (Warn 210 / Error 301 / Fatal 401 Cards)
+- [x] AC-DP-08 memory footprint: GetCatalogStats 포맷 검증
+
+**Fatal 처리 결정**:
+- `UE_LOG Fatal`은 process 종료 유발 → test harness crash 방지를 위해 `Error` 로그 + `[FATAL_THRESHOLD]` 접두어 + `bInitFatalTriggered = true` flag 조합으로 대체
+- Shipping 빌드에서 checkf 강제는 TD-013 (future)
+
+**Deferred**:
+- [5.6-VERIFY] AC-DP-09/10 실측 10회 반복: release-gate MANUAL test
+- TD-013: Fatal 로그를 Shipping 빌드에서 checkf로 강제 강화

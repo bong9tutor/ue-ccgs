@@ -4,6 +4,7 @@
 //
 // Story-1-5: UDataPipelineSubsystem 뼈대 + 4-state machine + pull API 스텁
 // Story-1-6: Initialize 4단계 실제 구현 + RegisterXxx helpers + DegradedFallback
+// Story-1-19: T_init budget 3-단계 overflow + Catalog size 3-단계 체크 + GetCatalogStats
 // ADR-0003: Sync 일괄 로드 채택 (Card → FinalForm → Dream → Stillness 순서 고정)
 // ADR-0002: 컨테이너 선택
 //
@@ -23,6 +24,7 @@
 #include "Data/DataPipelineSubsystem.h"
 #include "Engine/DataTable.h"
 #include "Engine/AssetManager.h"
+#include "Settings/MossDataPipelineSettings.h"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Log Category
@@ -44,12 +46,20 @@ void UDataPipelineSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
     const double StartTime = FPlatformTime::Seconds();
 
+    // Story 1-19: Settings 로컬 캐시 (null guard 포함)
+    const UMossDataPipelineSettings* Settings = UMossDataPipelineSettings::Get();
+
     // ── Step 1: Card DataTable (ADR-0003 §구체 로드 순서 R2 deterministic) ────
     UE_LOG(LogDataPipeline, Log, TEXT("Registering Card catalog..."));
     if (!RegisterCardCatalog())
     {
         EnterDegradedFallback(TEXT("Card"), TEXT("Card DataTable registration failed"));
         return; // AC-DP-03: 이후 단계 시도하지 않음 (즉시 return)
+    }
+    // Story 1-19: Card 등록 수 3-단계 overflow 체크 (AC-DP-10)
+    if (Settings && CardTable)
+    {
+        CheckCatalogSize(TEXT("Card"), CardTable->GetRowMap().Num(), Settings);
     }
 
     // ── Step 2: FinalForm DataAsset bucket ────────────────────────────────────
@@ -59,6 +69,11 @@ void UDataPipelineSubsystem::Initialize(FSubsystemCollectionBase& Collection)
         EnterDegradedFallback(TEXT("FinalForm"), TEXT("FinalForm catalog registration failed"));
         return; // AC-DP-03: 즉시 return
     }
+    // Story 1-19: FinalForm 등록 수 3-단계 overflow 체크 (AC-DP-10)
+    if (Settings)
+    {
+        CheckCatalogSize(TEXT("FinalForm"), FormRegistry.Num(), Settings);
+    }
 
     // ── Step 3: Dream DataAsset bucket ───────────────────────────────────────
     UE_LOG(LogDataPipeline, Log, TEXT("Registering Dream catalog..."));
@@ -66,6 +81,11 @@ void UDataPipelineSubsystem::Initialize(FSubsystemCollectionBase& Collection)
     {
         EnterDegradedFallback(TEXT("Dream"), TEXT("Dream catalog registration failed"));
         return; // AC-DP-03: 즉시 return
+    }
+    // Story 1-19: Dream 등록 수 3-단계 overflow 체크 (AC-DP-10)
+    if (Settings)
+    {
+        CheckCatalogSize(TEXT("Dream"), DreamRegistry.Num(), Settings);
     }
 
     // ── Step 4: Stillness single DataAsset ───────────────────────────────────
@@ -76,13 +96,17 @@ void UDataPipelineSubsystem::Initialize(FSubsystemCollectionBase& Collection)
         return; // AC-DP-03: 즉시 return
     }
 
-    // 4단계 모두 성공 → Ready 전이
-    // T_init 측정 (로그 전용 — ADR-0001 비위반: 시간 로직 아닌 순수 로그 목적)
-    const double Elapsed = (FPlatformTime::Seconds() - StartTime) * 1000.0;
-    UE_LOG(LogDataPipeline, Log, TEXT("Pipeline Ready — T_init = %.2f ms"), Elapsed);
-
-    // 3단계 T_init 임계 로그 (ADR-0003 §T_init 성능 예산) — Story 1-19에서 완성
-    // Normal ≤ 50ms / Warning ≤ 52.5ms / Error ≤ 75ms / Fatal > 100ms
+    // ── Story 1-19: T_init 3-단계 budget 평가 (AC-DP-09) ──────────────────────
+    // ADR-0001 비위반: 시간 로직 아닌 순수 로그/진단 목적
+    const double ElapsedMs = (FPlatformTime::Seconds() - StartTime) * 1000.0;
+    if (Settings)
+    {
+        EvaluateTInitBudget(ElapsedMs, Settings);
+    }
+    else
+    {
+        UE_LOG(LogDataPipeline, Log, TEXT("Pipeline Ready — T_init = %.2f ms (Settings null)"), ElapsedMs);
+    }
 
     CurrentState = EDataPipelineState::Ready;
 
@@ -422,3 +446,139 @@ void UDataPipelineSubsystem::RefreshCatalog()
 
     bRefreshInProgress = false;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Story 1-19: EvaluateTInitBudget — T_init 3-단계 overflow 평가 (AC-DP-09)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// Fatal threshold 처리 방침:
+//   UE_LOG Fatal은 process 종료 유발 → test harness crash 방지를 위해
+//   Error 로그 + [FATAL_THRESHOLD] 접두어 + bInitFatalTriggered = true 대체.
+//   Story 1-20에서 checkf 강제 강화 가능 (TD-013).
+//
+// ADR-0001 비위반: 시간 측정은 로그/진단 전용, 게임 로직 분기 없음.
+
+void UDataPipelineSubsystem::EvaluateTInitBudget(double ElapsedMs,
+                                                   const UMossDataPipelineSettings* Settings)
+{
+    if (!Settings) { return; }
+
+    const float Budget = Settings->MaxInitTimeBudgetMs;
+
+    if (ElapsedMs > Budget * Settings->CatalogOverflowFatalMultiplier)
+    {
+        UE_LOG(LogDataPipeline, Error,
+            TEXT("[FATAL_THRESHOLD] T_init %.2f ms > %.2f ms * %.2f — Pipeline exceeds fatal budget (MaxInitTimeBudgetMs)"),
+            ElapsedMs, Budget, Settings->CatalogOverflowFatalMultiplier);
+        bInitFatalTriggered = true;
+    }
+    else if (ElapsedMs > Budget * Settings->CatalogOverflowErrorMultiplier)
+    {
+        UE_LOG(LogDataPipeline, Error,
+            TEXT("T_init %.2f ms > %.2f ms * %.2f (Error) — Async Bundle 전환 검토 flag (MaxInitTimeBudgetMs)"),
+            ElapsedMs, Budget, Settings->CatalogOverflowErrorMultiplier);
+        bInitErrorTriggered = true;
+    }
+    else if (ElapsedMs > Budget * Settings->CatalogOverflowWarnMultiplier)
+    {
+        UE_LOG(LogDataPipeline, Warning,
+            TEXT("T_init %.2f ms > %.2f ms * %.2f (Warning) MaxInitTimeBudgetMs=%.2f"),
+            ElapsedMs, Budget, Settings->CatalogOverflowWarnMultiplier, Budget);
+        bInitWarningTriggered = true;
+    }
+    else
+    {
+        UE_LOG(LogDataPipeline, Log,
+            TEXT("T_init %.2f ms (Normal, budget %.2f)"), ElapsedMs, Budget);
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Story 1-19: CheckCatalogSize — Catalog 등록 수 3-단계 overflow 체크 (AC-DP-10)
+// ─────────────────────────────────────────────────────────────────────────────
+
+void UDataPipelineSubsystem::CheckCatalogSize(const FString& CatalogName, int32 Count,
+                                               const UMossDataPipelineSettings* Settings)
+{
+    if (!Settings) { return; }
+
+    // CatalogName에 따라 대응 MaxCatalogSize* 선택
+    int32 Budget = 200; // 알 수 없는 카탈로그 이름에 대한 기본값
+    if (CatalogName == TEXT("Card"))          { Budget = Settings->MaxCatalogSizeCards; }
+    else if (CatalogName == TEXT("Dream"))    { Budget = Settings->MaxCatalogSizeDreams; }
+    else if (CatalogName == TEXT("FinalForm")){ Budget = Settings->MaxCatalogSizeForms; }
+
+    const float WarnThresh  = Budget * Settings->CatalogOverflowWarnMultiplier;
+    const float ErrorThresh = Budget * Settings->CatalogOverflowErrorMultiplier;
+    const float FatalThresh = Budget * Settings->CatalogOverflowFatalMultiplier;
+
+    if (Count >= FatalThresh)
+    {
+        UE_LOG(LogDataPipeline, Warning,
+            TEXT("%s count %d >= Warn threshold %.0f"), *CatalogName, Count, WarnThresh);
+        UE_LOG(LogDataPipeline, Error,
+            TEXT("%s count %d >= Error threshold %.0f"), *CatalogName, Count, ErrorThresh);
+        UE_LOG(LogDataPipeline, Error,
+            TEXT("[FATAL_THRESHOLD] %s count %d >= Fatal threshold %.0f"), *CatalogName, Count, FatalThresh);
+        bInitFatalTriggered = true;
+    }
+    else if (Count >= ErrorThresh)
+    {
+        UE_LOG(LogDataPipeline, Warning,
+            TEXT("%s count %d >= Warn threshold %.0f"), *CatalogName, Count, WarnThresh);
+        UE_LOG(LogDataPipeline, Error,
+            TEXT("%s count %d >= Error threshold %.0f"), *CatalogName, Count, ErrorThresh);
+        bInitErrorTriggered = true;
+    }
+    else if (Count >= WarnThresh)
+    {
+        UE_LOG(LogDataPipeline, Warning,
+            TEXT("%s count %d >= Warn threshold %.0f"), *CatalogName, Count, WarnThresh);
+        bInitWarningTriggered = true;
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Story 1-19: GetCatalogStats — CPU-side 메모리 발자국 근사치 (AC-DP-08)
+// ─────────────────────────────────────────────────────────────────────────────
+//
+// 실제 동적 할당 측정이 아닌 항목 수 × 고정 바이트 근사치.
+//   Card: 160 bytes/row (FGiftCardRow 필드 추정 — FName×2, TArray<FName>, FText×2, FSoftObjectPath)
+//   Dream: 1280 bytes/asset (UDreamDataAsset — FText BodyText + metadata)
+//   Form: 320 bytes/asset (UMossFinalFormAsset — FName FormId + metadata)
+
+FString UDataPipelineSubsystem::GetCatalogStats() const
+{
+    constexpr int64 CardBytesPerRow    = 160;
+    constexpr int64 DreamBytesPerAsset = 1280;
+    constexpr int64 FormBytesPerAsset  = 320;
+
+    const int64 CardBytes  = CardTable ? int64(CardTable->GetRowMap().Num()) * CardBytesPerRow : 0;
+    const int64 DreamBytes = int64(DreamRegistry.Num()) * DreamBytesPerAsset;
+    const int64 FormBytes  = int64(FormRegistry.Num()) * FormBytesPerAsset;
+    const int64 Total      = CardBytes + DreamBytes + FormBytes;
+
+    return FString::Printf(
+        TEXT("Pipeline CPU-side: %lld bytes (Card=%lld, Dream=%lld, Form=%lld)"),
+        Total, CardBytes, DreamBytes, FormBytes);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Story 1-19: 테스트 전용 래퍼 (WITH_AUTOMATION_TESTS)
+// ─────────────────────────────────────────────────────────────────────────────
+
+#if WITH_AUTOMATION_TESTS
+
+void UDataPipelineSubsystem::TestingCheckCatalogSize(const FString& CatalogName, int32 Count)
+{
+    const UMossDataPipelineSettings* S = UMossDataPipelineSettings::Get();
+    if (S) { CheckCatalogSize(CatalogName, Count, S); }
+}
+
+void UDataPipelineSubsystem::TestingEvaluateTInitBudget(double ElapsedMs)
+{
+    const UMossDataPipelineSettings* S = UMossDataPipelineSettings::Get();
+    if (S) { EvaluateTInitBudget(ElapsedMs, S); }
+}
+
+#endif // WITH_AUTOMATION_TESTS

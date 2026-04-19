@@ -4,6 +4,7 @@
 //
 // Story-1-5: UDataPipelineSubsystem 뼈대 + 4-state machine + pull API 스텁
 // Story-1-6: Initialize 4단계 실제 구현 + RegisterXxx helpers + DegradedFallback
+// Story-1-19: T_init budget 3-단계 overflow threshold + Catalog size 체크 + GetCatalogStats
 // ADR-0003: Sync 일괄 로드 채택 (4-state machine, sync return contract)
 // ADR-0002: 컨테이너 선택 (Card=DT, FinalForm=DataAsset, Dream=DataAsset, Stillness=DataAsset)
 // ADR-0010: FMossFinalFormData read-only view struct (UObject 직접 노출 회피)
@@ -238,6 +239,15 @@ public:
      */
     FOnLoadComplete OnLoadComplete;
 
+    // ── Story 1-19: Memory footprint 통계 (AC-DP-08) ──────────────────────────
+
+    /**
+     * CPU-side 메모리 발자국 추정 문자열 반환 (AC-DP-08).
+     * 실제 동적 할당 측정이 아닌 항목 수 × 고정 바이트 근사치.
+     * 포맷: "Pipeline CPU-side: N bytes (Card=A, Dream=B, Form=C)"
+     */
+    FString GetCatalogStats() const;
+
     // ── 테스트 전용 훅 ────────────────────────────────────────────────────────
 
 #if WITH_AUTOMATION_TESTS
@@ -290,9 +300,54 @@ public:
         FormRegistry.Empty();
         FailedCatalogs.Empty();
     }
+
+    // ── Story 1-19: Budget flag 관찰 훅 ─────────────────────────────────────
+
+    /** [테스트 전용] CheckCatalogSize 직접 호출. */
+    void TestingCheckCatalogSize(const FString& CatalogName, int32 Count);
+
+    /** [테스트 전용] EvaluateTInitBudget 직접 호출. */
+    void TestingEvaluateTInitBudget(double ElapsedMs);
+
+    /** [테스트 전용] Fatal threshold 플래그 반환. */
+    bool TestingWasFatalTriggered() const { return bInitFatalTriggered; }
+
+    /** [테스트 전용] Error threshold 플래그 반환. */
+    bool TestingWasErrorTriggered() const { return bInitErrorTriggered; }
+
+    /** [테스트 전용] Warning threshold 플래그 반환. */
+    bool TestingWasWarningTriggered() const { return bInitWarningTriggered; }
+
+    /** [테스트 전용] Budget 플래그 전체 리셋. */
+    void TestingResetBudgetFlags()
+    {
+        bInitFatalTriggered = false;
+        bInitErrorTriggered = false;
+        bInitWarningTriggered = false;
+    }
 #endif
 
 private:
+    // ── Story 1-19: T_init 3-단계 budget 평가 (AC-DP-09) ─────────────────────
+
+    /**
+     * T_init 3-단계 overflow 분기 처리 (AC-DP-09).
+     * Warn: ElapsedMs > Budget × WarnMultiplier
+     * Error: ElapsedMs > Budget × ErrorMultiplier
+     * Fatal threshold: Error 로그 + [FATAL_THRESHOLD] 접두어 + bInitFatalTriggered = true
+     *   (UE_LOG Fatal은 process 종료 유발 → test harness crash 방지를 위해 Error 로그 대체.
+     *    Story 1-20에서 checkf 강제 강화 가능.)
+     */
+    void EvaluateTInitBudget(double ElapsedMs, const class UMossDataPipelineSettings* Settings);
+
+    /**
+     * 카탈로그 등록 수 3-단계 overflow 체크 (AC-DP-10).
+     * CatalogName: "Card" / "Dream" / "FinalForm" → 대응 MaxCatalogSize* 선택.
+     * 같은 Fatal 처리 방침: Error 로그 + [FATAL_THRESHOLD] 접두어 + bInitFatalTriggered.
+     */
+    void CheckCatalogSize(const FString& CatalogName, int32 Count,
+                          const class UMossDataPipelineSettings* Settings);
+
     // ── Initialize 단계별 등록 helpers (ADR-0003 §구체 로드 순서) ──────────────
 
     /**
@@ -360,4 +415,19 @@ private:
 
     /** RefreshCatalog 재진입 차단 플래그 (AC-DP-14). */
     bool bRefreshInProgress = false;
+
+    // ── Story 1-19: Budget overflow 관찰 플래그 (AC-DP-09/10) ────────────────
+    //
+    // UE_LOG Fatal 대신 Error 로그 + flag 조합으로 test harness crash 방지.
+    // 각 Initialize() 호출 시 EvaluateTInitBudget / CheckCatalogSize 에서 set.
+    // 테스트 사이 TestingResetBudgetFlags() 호출로 초기화.
+
+    /** Fatal threshold 초과 플래그 (T_init 또는 CatalogSize). */
+    bool bInitFatalTriggered = false;
+
+    /** Error threshold 초과 플래그 (T_init 또는 CatalogSize). */
+    bool bInitErrorTriggered = false;
+
+    /** Warning threshold 초과 플래그 (T_init 또는 CatalogSize). */
+    bool bInitWarningTriggered = false;
 };
