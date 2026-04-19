@@ -172,3 +172,15 @@ UE Automation 테스트는 UE 모듈 빌드 시스템 상 UE 모듈 내부에 �
   -ExecCmds="Automation RunTests MossBaby.Time.Subsystem.; Quit" \
   -nullrhi -nosound -log -unattended
 ```
+
+---
+
+## Story 1-14 — Between-session Classifier (Rules 1-4 + Formula 4/5)
+
+- 실제 cpp: `MadeByClaudeCode/Source/MadeByClaudeCode/Tests/TimeSessionClassifierTests.cpp`
+- 카테고리: `MossBaby.Time.Classifier.*`
+- AC 12개 → 12개 AUTOMATED 테스트 1:1 매핑
+- ADR-0001 엄수: 금지 패턴 grep 0 매치, WallDelta > expected_max 분기 없음, Rule 4 silent 수용
+- Formula 4: FMath::FloorToInt32 strict floor
+- Formula 5: strict `>` (24h 정각 시 ADVANCE_SILENT, 24h+1s 시 ADVANCE_WITH_NARRATIVE)
+- Clock null guard: SetClockSource 미호출 시 HOLD_LAST_TIME fallback

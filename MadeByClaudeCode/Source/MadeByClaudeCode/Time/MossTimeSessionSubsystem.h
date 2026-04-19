@@ -134,6 +134,14 @@ public:
     /** 현재 세션 레코드 조회 (read-only). */
     const FSessionRecord& GetCurrentRecord() const { return CurrentRecord; }
 
+#if WITH_AUTOMATION_TESTS
+    /** [테스트 전용] 이전 세션 레코드를 CurrentRecord에 직접 주입한다. */
+    void TestingInjectPrevRecord(const FSessionRecord& Record) { CurrentRecord = Record; }
+
+    /** [테스트 전용] CurrentRecord를 const 참조로 반환한다. */
+    const FSessionRecord& TestingGetCurrentRecord() const { return CurrentRecord; }
+#endif
+
     // ── Delegates ────────────────────────────────────────────────────────────
 
     /**

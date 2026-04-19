@@ -1,9 +1,10 @@
 # Story 004: Between-session Classifier (Rules 1-4) + Formulas 1, 4, 5
 
 > **Epic**: Time & Session System
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
+> **Estimate**: 0.7 days (~5 hours)
 > **Manifest Version**: 2026-04-19
 
 ## Context
@@ -168,3 +169,36 @@ ETimeAction UMossTimeSessionSubsystem::ClassifyOnStartup(const FSessionRecord* P
 
 - Depends on: Story 003 (Subsystem 뼈대 + Settings)
 - Unlocks: Story 005, 007
+
+---
+
+## Completion Notes
+
+**Completed**: 2026-04-19
+**Criteria**: 12/12 passing (모두 AUTOMATED)
+**Files delivered**:
+- `Time/MossTimeSessionSubsystem.h/.cpp` (수정) — ClassifyOnStartup 완전 구현 + Clock null guard + Settings include + DEFINE_LOG_CATEGORY_STATIC(LogMossTime)
+- `Tests/TimeSessionClassifierTests.cpp` (신규, 12 tests)
+- `tests/unit/time-session/README.md` (Story 1-14 섹션 append)
+
+**Test Evidence**: 12 UE Automation — `MossBaby.Time.Classifier.{FirstRun/BackwardGapReject/BackwardGapRepeated/LongGapSilentBoundaryOver/LongGapBoundaryExact/AcceptedGapSilent/AcceptedGapNarrativeThreshold/NarrativeThresholdExactBoundary/NarrativeCapEnforced/DayIndexFormulaFloor/DayIndexClampUpper/DayIndexCorruptionClamp}`
+
+**AC 12/12 매핑** (1:1):
+- FIRST_RUN, BACKWARD_GAP_REJECT/REPEATED, LONG_GAP_SILENT_BOUNDARY_OVER/EXACT, ACCEPTED_GAP_SILENT, ACCEPTED_GAP_NARRATIVE_THRESHOLD, NARRATIVE_THRESHOLD_EXACT_BOUNDARY, NARRATIVE_CAP_ENFORCED, DAYINDEX_FORMULA_FLOOR/CLAMP_UPPER/CORRUPTION_CLAMP
+
+**ADR-0001 준수**:
+- 금지 패턴 새 코드에 0 매치 (주석 1줄에만 언급 — "미사용" 설명)
+- `WallDelta > expected_max` 의심 분기 없음
+- Rule 4는 Forward 경과를 조건 없이 silent 수용 (ADR 원문 준수)
+- `FDateTime::UtcNow`/`FPlatformTime::Seconds` 직접 호출 없음 (모두 Clock 경유)
+
+**Formula 엄수**:
+- Formula 4 `FMath::FloorToInt32` strict floor
+- Formula 5 strict `>` (24h 정각 = ADVANCE_SILENT, 24h+1s = ADVANCE_WITH_NARRATIVE)
+- Rule 3 LONG_GAP strict `>` (21일 정각 = LONG_GAP 미해당, Rule 4 경로)
+
+**Clock null guard**: SetClockSource 미호출 시 HOLD_LAST_TIME fallback + Warning 로그 (production 주입 책임 명시)
+
+**Deferred**:
+- Save/Load 연동: `IncrementNarrativeCountAndSave` 현재 CurrentRecord.NarrativeCount +=1만 수행 (Story 1-7 이전 상태). 실제 save trigger는 Subsystem 상호 구독 Integration story 필요.
+- Farewell 상태 전환: OnFarewellReached delegate 발행만. 실제 GSM 상태 머신은 GSM epic 소비.

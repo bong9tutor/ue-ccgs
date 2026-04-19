@@ -1,13 +1,13 @@
 // Copyright Moss Baby
 //
-// MossTimeSessionSubsystem.cpp — Time & Session System 메인 서브시스템 최소 구현
+// MossTimeSessionSubsystem.cpp — Time & Session System 메인 서브시스템 구현
 //
 // Story-003: UMossTimeSessionSubsystem 뼈대 (스텁 구현)
+// Story 1-14: Between-session Classifier Rules 1-4 + Formula 4/5 실제 구현
 // ADR-0001: Forward Time Tamper 명시적 수용 정책 참조
 // ADR-0011: Tuning Knob UDeveloperSettings 채택 참조
 // GDD: design/gdd/time-session-system.md
 //
-// Story 004에서 ClassifyOnStartup 실제 8-Rule Classifier 로직 구현 예정.
 // Story 005에서 In-session TickInSession 1Hz 구현 예정.
 // Story 1-7에서 TriggerSaveForNarrative SaveSubsystem 연동 구현 예정.
 //
@@ -16,6 +16,9 @@
 //   모든 시간 접근은 Clock->GetUtcNow() / Clock->GetMonotonicSec() 경유.
 
 #include "Time/MossTimeSessionSubsystem.h"
+#include "Settings/MossTimeSessionSettings.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogMossTime, Log, All);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Lifecycle
@@ -54,17 +57,75 @@ void UMossTimeSessionSubsystem::SetClockSource(TSharedPtr<IMossClockSource> InCl
 
 ETimeAction UMossTimeSessionSubsystem::ClassifyOnStartup(const FSessionRecord* PrevRecord)
 {
-    // Story 004에서 실제 8-Rule Classifier 로직 구현.
-    // Story 003 안전 스텁:
-    //   - PrevRecord == nullptr → 최초 실행 → START_DAY_ONE
-    //   - 유효 레코드 존재 → 분류 보류 → HOLD_LAST_TIME
-    if (PrevRecord == nullptr)
+    // Clock null guard — SetClockSource 미호출 시 안전 fallback
+    if (!Clock.IsValid())
     {
+        UE_LOG(LogMossTime, Warning, TEXT("Clock source not injected — HOLD_LAST_TIME fallback"));
+        return ETimeAction::HOLD_LAST_TIME;
+    }
+
+    // Rule 1 — FIRST_RUN
+    if (!PrevRecord)
+    {
+        CurrentRecord.SessionUuid = FGuid::NewGuid();
+        CurrentRecord.DayIndex = 1;
+        CurrentRecord.LastWallUtc = Clock->GetUtcNow();
+        CurrentRecord.LastMonotonicSec = Clock->GetMonotonicSec();
+        OnTimeActionResolved.Broadcast(ETimeAction::START_DAY_ONE);
         return ETimeAction::START_DAY_ONE;
     }
 
-    // Story 004 이전 임시 반환. 실제 Rule 2~4 분류 미적용.
-    return ETimeAction::HOLD_LAST_TIME;
+    CurrentRecord = *PrevRecord;
+
+    // E13 corruption clamp (sanity check before classification)
+    const UMossTimeSessionSettings* Settings = UMossTimeSessionSettings::Get();
+    CurrentRecord.DayIndex = FMath::Clamp(CurrentRecord.DayIndex, 1, Settings->GameDurationDays);
+
+    const FDateTime Now = Clock->GetUtcNow();
+    const FTimespan WallDelta = Now - PrevRecord->LastWallUtc;
+    const double WallDeltaSec = WallDelta.GetTotalSeconds();
+
+    // Rule 2 — BACKWARD_GAP_REJECT (유일하게 시각 거부)
+    if (WallDeltaSec < 0.0)
+    {
+        OnTimeActionResolved.Broadcast(ETimeAction::HOLD_LAST_TIME);
+        return ETimeAction::HOLD_LAST_TIME; // LastWallUtc 갱신 없음
+    }
+
+    // Rule 3 — LONG_GAP_SILENT (> 21일)
+    const double GameDurationSec = Settings->GameDurationDays * 86400.0;
+    if (WallDeltaSec > GameDurationSec)
+    {
+        CurrentRecord.DayIndex = Settings->GameDurationDays; // clamp 21
+        OnTimeActionResolved.Broadcast(ETimeAction::LONG_GAP_SILENT);
+        OnFarewellReached.Broadcast(EFarewellReason::LongGapAutoFarewell);
+        return ETimeAction::LONG_GAP_SILENT;
+    }
+
+    // Rule 4 — ACCEPTED_GAP (ADR-0001: Forward 경과도 여기로 silent 수용)
+    // Formula 4: DayIndex 전진
+    const int32 DaysElapsed = FMath::FloorToInt32(WallDeltaSec / 86400.0);
+    const int32 NewDayIndex = FMath::Clamp(PrevRecord->DayIndex + DaysElapsed, 1, Settings->GameDurationDays);
+    CurrentRecord.DayIndex = NewDayIndex;
+    CurrentRecord.LastWallUtc = Now;
+
+    // Formula 5 — Narrative threshold (strict `>` + cap)
+    const double NarrativeThresholdSec = Settings->NarrativeThresholdHours * 3600.0;
+    const bool bCrossThreshold = WallDeltaSec > NarrativeThresholdSec;
+    const bool bUnderCap = PrevRecord->NarrativeCount < Settings->NarrativeCapPerPlaythrough;
+
+    if (bCrossThreshold && bUnderCap)
+    {
+        IncrementNarrativeCountAndSave();
+        OnTimeActionResolved.Broadcast(ETimeAction::ADVANCE_WITH_NARRATIVE);
+        return ETimeAction::ADVANCE_WITH_NARRATIVE;
+    }
+    if (bCrossThreshold && !bUnderCap)
+    {
+        UE_LOG(LogMossTime, Verbose, TEXT("cap reached, narrative suppressed"));
+    }
+    OnTimeActionResolved.Broadcast(ETimeAction::ADVANCE_SILENT);
+    return ETimeAction::ADVANCE_SILENT;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
