@@ -6,7 +6,7 @@ goal: "Foundation 4 시스템의 뼈대와 핵심 계약 확립 — Core sprint 
 start: "2026-04-21"
 end: "2026-05-02"
 generated: "2026-04-19"
-updated: "2026-04-19 (Story 1-1 COMPLETE)"
+updated: "2026-04-19 (Story 1-1, 1-2 COMPLETE)"
 
 stories:
   # === Must Have (Critical Path — Foundation skeleton) ===
@@ -26,12 +26,12 @@ stories:
     name: "Time 002 — FSessionRecord struct + double precision round-trip"
     file: "production/epics/foundation-time-session/story-002-session-record-struct.md"
     priority: must-have
-    status: backlog
-    owner: ""
+    status: done
+    owner: "unreal-specialist"
     estimate_days: 0.3
     depends_on: ["1-1"]
     blocker: ""
-    completed: ""
+    completed: "2026-04-19"
 
   - id: "1-3"
     name: "Time 003 — UMossTimeSessionSubsystem 뼈대 + enums + Settings"

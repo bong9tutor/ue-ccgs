@@ -1,9 +1,10 @@
 # Story 002: FSessionRecord 구조체 + double precision runtime round-trip
 
 > **Epic**: Time & Session System
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
+> **Estimate**: 0.3 days (~2 hours)
 > **Manifest Version**: 2026-04-19
 
 ## Context
@@ -99,3 +100,23 @@ static_assert(std::is_same_v<decltype(FSessionRecord::LastMonotonicSec), double>
 
 - Depends on: Story 001 (IMossClockSource — 타입 의존 없으나 동일 모듈 내 배치)
 - Unlocks: Story 003 (Subsystem이 `FSessionRecord`를 멤버로 보유)
+
+---
+
+## Completion Notes
+
+**Completed**: 2026-04-19
+**Criteria**: 2/2 passing (AC-1 CODE_REVIEW static_assert + AC-2 AUTOMATED round-trip)
+**Files delivered**:
+- `MadeByClaudeCode/Source/MadeByClaudeCode/Time/SessionRecord.h` (신규, USTRUCT + static_assert)
+- `MadeByClaudeCode/Source/MadeByClaudeCode/Tests/SessionRecordTests.cpp` (신규, 4 tests + round-trip helper)
+- `tests/unit/time-session/README.md` (Story 1-2 섹션 append, 1-1 섹션 보존)
+**Round-trip 방식**: `FMemoryWriter`/`FMemoryReader` + `FObjectAndNameAsStringProxyArchive` + `UScriptStruct::SerializeItem` (`ArIsSaveGame=false` — 모든 UPROPERTY 필드 직렬화)
+**Test Evidence**: 4 tests — `MossBaby.Time.SessionRecord.*` 카테고리. 21일 기준값(1814400.123) + 극소(1e-9) + 극대(1e9) + 필드 손상 검증(LastWallUtc/DayIndex/NarrativeCount/SessionCountToday/LastSaveReason).
+**Code Review**: APPROVED WITH SUGGESTIONS (unreal-specialist) + TESTABLE (qa-tester — GAPS 인라인 보완 완료)
+**ADR-0001 준수**: 금지 패턴 grep 0 매치. `FDateTime::UtcNow`/`FPlatformTime::Seconds` 직접 호출 없음.
+**Deviations**:
+- **ADVISORY (TD-003)**: Story 1-7 Save/Load 진입 시 `FSessionRecord` 모든 필드에 `UPROPERTY(SaveGame)` specifier 소급 추가 여부 결정 필요. 현재 `ArIsSaveGame=false` 경로라 미추가지만, `USaveGame` 기반 경로 선택 시 필요. tech-debt 등록.
+**QA Gaps 보완 (세션 내 처리)**:
+- GAP #1 (LastWallUtc round-trip assert 누락) → `TestEqual(Loaded.LastWallUtc.GetTicks(), Source.LastWallUtc.GetTicks())` 추가
+- GAP #2 (ArIsSaveGame=true dead code) → 대입 제거 + 주석 정리
