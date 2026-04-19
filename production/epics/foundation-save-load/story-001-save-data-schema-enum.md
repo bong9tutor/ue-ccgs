@@ -1,9 +1,10 @@
 # Story 001: UMossSaveData USaveGame 서브클래스 + ESaveReason enum + SaveSchemaVersion + Developer Settings
 
 > **Epic**: Save/Load Persistence
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
+> **Estimate**: 0.3 days (~2 hours)
 > **Manifest Version**: 2026-04-19
 
 ## Context
@@ -142,3 +143,27 @@ public:
 
 - Depends on: **foundation-time-session Story 002** (FSessionRecord 타입 — 크로스-에픽 의존)
 - Unlocks: Story 002, 003
+
+---
+
+## Completion Notes
+
+**Completed**: 2026-04-19
+**Criteria**: 5/5 passing (4 AUTOMATED + 1 CODE_REVIEW)
+**Files delivered**:
+- `SaveLoad/MossSaveData.h` (154 lines, USaveGame + ESaveReason + placeholders)
+- `Settings/MossSaveLoadSettings.h` (141 lines, 5 knobs)
+- `Tests/MossSaveDataTests.cpp` (226 lines, 5 tests)
+- `tests/unit/save-load/README.md` (신규 폴더)
+
+**Test Evidence**: 5 UE Automation — `MossBaby.SaveLoad.Schema.{Defaults/CurrentSchemaVersionConst/ESaveReasonStableIntegers/ESaveReasonName/SaveLoadSettingsCDO}`.
+
+**ADR 준수**:
+- ADR-0001 grep: 0 매치
+- ADR-0011: UDeveloperSettings 패턴 (Config=Game, DefaultConfig, Category="Moss Baby", Section="Save/Load Persistence", static Get)
+
+**Out of Scope**:
+- Story 1-8: USaveLoadSubsystem 뼈대
+- Story 1-9: Header + CRC32
+- Story 1-10: Atomic write + dual-slot
+- FGrowthState/FDreamState 실제 필드 (Growth/Dream epic 소관)

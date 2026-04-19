@@ -6,7 +6,7 @@ goal: "Foundation 4 시스템의 뼈대와 핵심 계약 확립 — Core sprint 
 start: "2026-04-21"
 end: "2026-05-02"
 generated: "2026-04-19"
-updated: "2026-04-19 (Story 1-1~1-6 COMPLETE — Pipeline epic 마무리)"
+updated: "2026-04-19 (Story 1-1~1-7 COMPLETE)"
 
 stories:
   # === Must Have (Critical Path — Foundation skeleton) ===
@@ -81,12 +81,12 @@ stories:
     name: "Save/Load 001 — UMossSaveData USaveGame + ESaveReason + Settings"
     file: "production/epics/foundation-save-load/story-001-save-data-schema-enum.md"
     priority: must-have
-    status: backlog
-    owner: ""
+    status: done
+    owner: "unreal-specialist"
     estimate_days: 0.3
     depends_on: ["1-2"]
     blocker: ""
-    completed: ""
+    completed: "2026-04-19"
 
   - id: "1-8"
     name: "Save/Load 002 — Subsystem 4-trigger lifecycle + coalesce"
