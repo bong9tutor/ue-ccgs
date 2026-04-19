@@ -53,3 +53,80 @@ grep -rE "(int32|float|double) [A-Z][A-Za-z]*" \
 - ADR-0002: Data Pipeline 컨테이너 선택 (C1/C2 schema gate 정의)
 - ADR-0010: FFinalFormRow 저장 형식 — UPrimaryDataAsset 격상
 - ADR-0011: Tuning Knob 노출 방식 — UDeveloperSettings 채택
+
+---
+
+## Story 1-5 — Pipeline Subsystem Skeleton + 4-State Machine
+
+### 실제 테스트 파일
+
+```
+MadeByClaudeCode/Source/MadeByClaudeCode/Tests/DataPipelineSubsystemTests.cpp
+```
+
+### 카테고리
+
+```
+MossBaby.Data.Pipeline.*
+```
+
+### 헤드리스 실행 명령
+
+```bash
+UnrealEditor-Cmd.exe MadeByClaudeCode.uproject \
+  -ExecCmds="Automation RunTests MossBaby.Data.Pipeline.; Quit" \
+  -nullrhi -nosound -log -unattended
+```
+
+### AC 매핑
+
+| Automation Test | AC | 타입 | Gate |
+|---|---|---|---|
+| `MossBaby.Data.Pipeline.InitialState` | AC-DP-01 (skeleton: Uninitialized 초기 상태), GetState/IsReady | AUTOMATED | BLOCKING |
+| `MossBaby.Data.Pipeline.PullAPIReturnsEmptyOnReady` | AC-DP-04 skeleton (GetCardRow NAME_None 빈 TOptional) | AUTOMATED | BLOCKING |
+| `MossBaby.Data.Pipeline.DelegateBind` | OnLoadComplete delegate 바인딩 + Broadcast 인자 전달 | AUTOMATED | BLOCKING |
+| `MossBaby.Data.Pipeline.DeinitClearsRegistries` | Deinitialize 후 IsReady() == false, GetState() == Uninitialized | AUTOMATED | BLOCKING |
+| EDataPipelineState enum 정의 | 헤더 컴파일 (이 테스트 파일 컴파일 = enum 존재 증명) | CODE_REVIEW | BLOCKING |
+| Pull API 8개 선언 | 모두 뼈대 스텁 — Story 1-6에서 실제 catalog 연동 | CODE_REVIEW | BLOCKING |
+
+### AC-DP-13 checkf CI 전략
+
+AC-DP-13: `Uninitialized`/`Loading` 상태에서 pull API 호출 시 `checkf` assertion 발동 (Debug/Development 빌드).
+
+`checkf` 실패는 process abort를 유발하므로 UE Automation으로 직접 트리거 불가.
+
+**CI 검증 방법 (CODE_REVIEW / BLOCKING)**:
+
+```bash
+# 8개 pull API 함수 모두 "AC-DP-13" 문자열 포함 checkf 존재 확인
+grep -c "AC-DP-13" MadeByClaudeCode/Source/MadeByClaudeCode/Data/DataPipelineSubsystem.cpp
+# 기대 결과: 8 이상 (각 pull API 함수별 checkf 1개)
+```
+
+Shipping 빌드에서의 `checkf` 동작: UE의 `checkf`는 `DO_CHECK` 매크로로 제어되며,
+`Shipping` 구성에서는 기본적으로 `DO_CHECK=0`으로 비활성화될 수 있음.
+ADR-0003 §AC-DP-13 권고에 따라 Shipping에서도 유지가 권장되며,
+`UE_BUILD_SHIPPING` 환경에서의 동작은 Implementation 단계에서 실측 검증 필요.
+
+### 생성/수정 파일
+
+| 파일 | 역할 |
+|---|---|
+| `MadeByClaudeCode/Source/MadeByClaudeCode/Data/DataPipelineSubsystem.h` | UGameInstanceSubsystem 뼈대 + 4-state machine + pull API 선언 |
+| `MadeByClaudeCode/Source/MadeByClaudeCode/Data/DataPipelineSubsystem.cpp` | 최소 구현 (pull API 스텁 + checkf + state machine) |
+| `MadeByClaudeCode/Source/MadeByClaudeCode/Data/MossFinalFormData.h` | FMossFinalFormData read-only view struct (ADR-0010) |
+| `MadeByClaudeCode/Source/MadeByClaudeCode/Tests/DataPipelineSubsystemTests.cpp` | UE Automation 테스트 4개 |
+
+### Out of Scope
+
+- AC-DP-01 Integration test (UGameInstance lifecycle 통합 — Story 1-7 또는 별도 integration)
+- Story 002 (DefaultEngine.ini PrimaryAssetTypesToScan 등록)
+- Story 1-6 (실제 카탈로그 등록/로딩 로직 — RegisterCard/FinalForm/Dream/StillnessCatalog)
+- Story 1-7 (PIE hot-swap RefreshCatalog 완성, Save/Load 연동, OnLoadComplete 파라미터 실제화)
+- AC-DP-09/10 (T_init 실측 + 3단계 임계 로그 — Story 1-6 구현 후 적용)
+
+### 관련 ADR
+
+- ADR-0003: Data Pipeline 로딩 전략 — Sync 일괄 로드 채택 (4-state machine)
+- ADR-0002: Data Pipeline 컨테이너 선택 (pull API 반환 타입 근거)
+- ADR-0010: FFinalFormRow 저장 형식 — FMossFinalFormData read-only view 근거

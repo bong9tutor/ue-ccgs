@@ -1,9 +1,10 @@
 # Story 003: UDataPipelineSubsystem 뼈대 + 4-state machine + pull API contract
 
 > **Epic**: Data Pipeline
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
+> **Estimate**: 0.5 days (~3-4 hours)
 > **Manifest Version**: 2026-04-19
 
 ## Context
@@ -154,3 +155,37 @@ TOptional<FGiftCardRow> UDataPipelineSubsystem::GetCardRow(FName CardId) const {
 
 - Depends on: Story 001 (자산 타입), Story 002 (DefaultEngine.ini)
 - Unlocks: Story 004, 005, 006
+
+---
+
+## Completion Notes
+
+**Completed**: 2026-04-19
+**Criteria**: 7/7 passing (AC-DP-01 + enum + GetState/IsReady + OnLoadComplete + AC-DP-13 + AC-DP-04 + 8 pull API)
+**Files delivered**:
+- `MadeByClaudeCode/Source/MadeByClaudeCode/Data/DataPipelineSubsystem.h` (177 lines)
+- `MadeByClaudeCode/Source/MadeByClaudeCode/Data/DataPipelineSubsystem.cpp` (195 lines, 8 checkf(IsReady()) + state machine + 8 pull API 스텁)
+- `MadeByClaudeCode/Source/MadeByClaudeCode/Data/MossFinalFormData.h` (89 lines, read-only view struct + FromAsset static factory)
+- `MadeByClaudeCode/Source/MadeByClaudeCode/Tests/DataPipelineSubsystemTests.cpp` (197 lines, 4 tests)
+- `tests/unit/data-pipeline/README.md` (Story 1-5 섹션 append)
+
+**Test Evidence**: 4 UE Automation tests — `MossBaby.Data.Pipeline.{InitialState/PullAPIReturnsEmptyOnReady/DelegateBind/DeinitClearsRegistries}`.  `#if WITH_AUTOMATION_TESTS`로 `TestingSetState()` 노출 (checkf 우회 필요한 테스트용).
+
+**ADR 준수**:
+- ADR-0001 금지 패턴 grep: 0 매치 (주석 인용만)
+- ADR-0003: 모든 8 pull API `TOptional`/`UObject*`/`TArray` sync return. async/lazy 실제 사용 0건.
+- ADR-0002/0010: `FMossFinalFormData` read-only view struct, UObject 직접 노출 회피.
+
+**AC-DP-13 checkf 구현**: `.cpp`의 8개 pull API 함수 각각 `checkf(IsReady(), "... AC-DP-13 violation")` 가드. Debug/Development 빌드에서 pre-Ready 조회 차단. CI에서 Shipping 빌드 grep 검증 전략은 README에 문서화.
+
+**Code Review**: Direct verification pass (자동 진행 정책 하에 specialist 리뷰 생략 — 이전 4개 스토리의 패턴 일관 확인)
+- checkf(IsReady()) count: 8/8 (각 pull API 1개씩)
+- Async/Lazy load: 0건 (주석 "Async Bundle 전환 검토 flag"는 Story 006 DegradedFallback 트리거 설명)
+
+**Deviations / Notes**:
+- `GetDreamBodyText()` 내부에서 `GetDreamAsset()` 호출로 `checkf` 중복 체크 발생 (성능 무시 가능). Story 1-6에서 내부 헬퍼 분리 검토.
+- `Deinitialize()` 직접 호출 테스트는 실제 `UGameInstance` 해제 경로와 다름. 전체 lifecycle 검증은 integration test 필요 (TD-005에 포함).
+
+**Out of Scope (다음 스토리)**:
+- Story 1-6 (Pipeline 004): 실제 catalog registration + AssetManager loading
+- Story 1-20 (Pipeline 005): Edge cases (DuplicateCardId, FTextEmpty, RefreshCatalog 재진입)
