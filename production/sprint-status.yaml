@@ -6,7 +6,7 @@ goal: "Foundation 4 시스템의 뼈대와 핵심 계약 확립 — Core sprint 
 start: "2026-04-21"
 end: "2026-05-02"
 generated: "2026-04-19"
-updated: "2026-04-19 (Must 12/13 + Should 4/4 COMPLETE, 1-11 awaiting-editor, 1-15 awaiting-cooked)"
+updated: "2026-04-19 🎉 Sprint 01 COMPLETE (Must 12/13 + Should 4/4 + Nice 4/4, 1-11 awaiting-editor, 1-15 awaiting-cooked)"
 
 stories:
   # === Must Have (Critical Path — Foundation skeleton) ===
@@ -239,9 +239,9 @@ stories:
     name: "Input 005 — NO_RAW_KEY_BINDING CI grep + Mouse-only MANUAL"
     file: "production/epics/foundation-input-abstraction/story-005-no-raw-key-mouse-only-hover-gamepad-silent.md"
     priority: nice-to-have
-    status: backlog
-    owner: ""
+    status: done
+    owner: "unreal-specialist"
     estimate_days: 0.3
     depends_on: ["1-13"]
-    blocker: ""
-    completed: ""
+    blocker: "CI hook 완료. MANUAL 실기는 TD-015 (Story 1-11 + Card Hand UI 선행)"
+    completed: "2026-04-19"

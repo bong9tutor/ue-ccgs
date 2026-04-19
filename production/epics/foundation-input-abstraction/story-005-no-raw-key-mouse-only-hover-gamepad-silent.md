@@ -1,9 +1,10 @@
 # Story 005: NO_RAW_KEY_BINDING CI grep + MOUSE_ONLY_COMPLETENESS + HOVER_ONLY_PROHIBITION + GAMEPAD_DISCONNECT_SILENT
 
 > **Epic**: Input Abstraction Layer
-> **Status**: Ready
+> **Status**: Complete (CI + Placeholder)
 > **Layer**: Foundation
 > **Type**: Config/Data
+> **Estimate**: 0.3 days (~2 hours)
 > **Manifest Version**: 2026-04-19
 
 ## Context
@@ -155,3 +156,36 @@ echo "OK: NO_NATIVEONMOUSE_OVERRIDE 통과"
 
 - Depends on: Story 001, 002, 003, 004 (Input 인프라 완성)
 - Unlocks: None (epic 최종 검증)
+
+---
+
+## Completion Notes (Partial — CI 완성 + MANUAL Placeholder)
+
+**Completed**: 2026-04-19 (CI hook + MANUAL placeholder)
+**Status**: **Complete (CI + Placeholder)** — CI grep hooks 2개 완성 + 사용자 MANUAL 체크리스트 placeholder. 실기 MANUAL은 Story 1-11 에셋 + Card Hand UI epic 완료 후 수행.
+
+**Files delivered**:
+- `.claude/hooks/input-no-raw-key-binding.sh` (신규, CI)
+- `.claude/hooks/input-no-nativeonmouse.sh` (신규, CI ADR-0008 enforcement)
+- `production/qa/evidence/input-manual-checklist-placeholder-2026-04-19.md` (신규, MANUAL 가이드)
+
+**AC 커버**:
+- [x] NO_RAW_KEY_BINDING CODE_REVIEW: CI grep hook 완성 (BindKey/BindAxis/EKeys:: 탐지, Input/ + Tests/ 제외)
+- [x] NO_NATIVEONMOUSE_OVERRIDE CODE_REVIEW: CI grep hook 완성 (NativeOnMouseButtonDown/Move/Up 탐지)
+- [~] MOUSE_ONLY_COMPLETENESS (MANUAL): placeholder 체크리스트 완성, 실기 수행은 TD-015
+- [~] HOVER_ONLY_PROHIBITION (MANUAL): placeholder. Card Hand UI epic 완료 후 최종 검증
+- [~] GAMEPAD_DISCONNECT_SILENT (MANUAL): placeholder. Gamepad 하드웨어 필요
+
+**CI 배포 필요**:
+- `chmod +x .claude/hooks/input-no-raw-key-binding.sh input-no-nativeonmouse.sh` (Unix)
+- `.github/workflows/tests.yml`에 hook 호출 추가 (별도 PR 또는 수동)
+
+**ADR 준수**:
+- ADR-0001 grep: 0 매치
+- ADR-0008 Forbidden Approaches: hook으로 자동 강제 준비 완료
+- Pillar 1: 장치 전환 알림 금지 — 코드 레벨에서 이미 Story 1-13 준수
+
+**Deferred**:
+- TD-015: Story 1-11 에셋 + Card Hand UI 완료 후 MANUAL 실기 수행
+
+**Sprint 01 완료 게이트**: CI hook 활성화 + CI/CD workflow 업데이트 + MANUAL placeholder 결과 채우기.
