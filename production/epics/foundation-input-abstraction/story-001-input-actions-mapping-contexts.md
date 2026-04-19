@@ -1,9 +1,10 @@
 # Story 001: 6 InputAction 에셋 정의 + IMC_MouseKeyboard + IMC_Gamepad 매핑 컨텍스트
 
 > **Epic**: Input Abstraction Layer
-> **Status**: Ready
+> **Status**: Awaiting Editor
 > **Layer**: Foundation
 > **Type**: Config/Data
+> **Estimate**: 0.3 days (~2 hours, Editor 수동)
 > **Manifest Version**: 2026-04-19
 
 ## Context
@@ -107,3 +108,26 @@
 
 - Depends on: None (Foundation 독립)
 - Unlocks: Story 002, 003
+
+---
+
+## Completion Notes (Partial — Awaiting Editor Asset Creation)
+
+**Partially Completed**: 2026-04-19 (agent automation limit)
+**Status**: **Awaiting Editor** — Config/Data 스토리이고 .uasset 바이너리 생성은 UE Editor GUI 필수 작업. Agent 자동화 불가.
+
+**Agent 완료 작업**:
+- `production/qa/evidence/input-actions-placeholder-2026-04-19.md` 신규 — 사용자 수동 에셋 생성 가이드 + 체크리스트 + 스크린샷 템플릿
+- tech-debt TD-008 등록 (Sprint 1 종료 전 해결 필수)
+
+**사용자 수동 작업 필요** (Sprint 1 종료 전):
+1. UE Editor에서 `Content/Input/Actions/` 폴더 생성
+2. 6 UInputAction 에셋 생성 (`IA_PointerMove` Axis2D + 5 Digital)
+3. `Content/Input/Contexts/IMC_MouseKeyboard` 생성 + Rule 2a 바인딩 테이블
+4. `IA_OfferCard` Trigger = UInputTriggerHold (HoldTimeThreshold 0.15 — Formula 2 마우스 임계)
+5. `IMC_Gamepad` 구조 생성 (5 Action 슬롯, MVP)
+6. 4장 스크린샷 evidence 첨부
+
+**Story 1-12/1-13 진행 전제**: C++ 코드는 에셋 이름 상수 (`IA_PointerMove` 등) 참조하여 런타임 로드. 에셋이 없어도 C++ 코드 작성은 가능하나 실제 테스트는 에셋 생성 이후.
+
+**Sprint 1 완료 게이트**: 이 Story는 Must Have. 사용자 에디터 작업 완료 후 Status: Awaiting Editor → Complete 전환, sprint-status.yaml 갱신.
