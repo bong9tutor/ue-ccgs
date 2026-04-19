@@ -3,25 +3,23 @@
 // MossInputAbstractionSubsystem.h — Input Abstraction Layer 메인 서브시스템 선언
 //
 // Story-1-12: UMossInputAbstractionSubsystem + UMossInputAbstractionSettings + IMC 등록
+// Story-1-13: EInputMode auto-detect (Formula 1 hysteresis) + OnInputModeChanged delegate
+//             + APlayerController::SetShowMouseCursor 전환
 // ADR-0011: Tuning Knob UDeveloperSettings 채택 참조
-// GDD: design/gdd/input-abstraction-layer.md §Core Rules / §Lifecycle
+// GDD: design/gdd/input-abstraction-layer.md §Core Rules / §Lifecycle / §Formula 1
 //
 // AC 커버리지:
 //   AC-1: UMossInputAbstractionSettings 3 knobs — 별도 헤더 (MossInputAbstractionSettings.h)
 //   AC-2: UMossInputAbstractionSubsystem 뼈대 (Initialize/Deinitialize + 6 Action 로드)
 //   AC-3: Subsystem Initialize에서 IMC_MouseKeyboard + IMC_Gamepad 등록
-//   AC-4: EInputMode enum (Mouse, Gamepad) — Story-1-13에서 auto-detect 구현 예정
+//   AC-4: EInputMode enum (Mouse, Gamepad)
 //   AC-5: 6 UInputAction + 2 UInputMappingContext UPROPERTY TObjectPtr 보관
+//   Story-1-13 AC: FOnInputModeChanged delegate + Formula 1 auto-detect + cursor 전환
 //
 // Story-1-11 에셋 미생성 정책:
 //   - LoadObject 반환값 null 허용 — crash 없이 동작
 //   - bMappingContextRegistered == false 유지 (에셋 생성 후 자동으로 true로 전환)
 //   - TD-008: Story-1-11 에셋 UE Editor 수동 생성 대기 중
-//
-// Story-1-13에서 추가 예정:
-//   - OnInputModeChanged delegate
-//   - EInputMode auto-detect (Formula 1 hysteresis)
-//   - APlayerController::SetShowMouseCursor 전환
 //
 // Story-1-17에서 추가 예정:
 //   - Offer Hold Formula 2 경계값 적용
@@ -37,8 +35,8 @@
 // EInputMode — 현재 입력 모드
 //
 // GDD §AC-4: Mouse / Gamepad 두 상태.
-// Story-1-13에서 실제 auto-detect (Formula 1 hysteresis) 로직 구현 예정.
-// 현재(Story-1-12)는 기본값 Mouse로 고정 — Gamepad 전환 조건 미구현.
+// Story-1-13: Formula 1 hysteresis auto-detect 구현 완료.
+// uint8 기반 — stable integer 보장 (0=Mouse, 1=Gamepad).
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -47,7 +45,6 @@
  * Mouse: 마우스/키보드 입력이 활성 상태.
  * Gamepad: 게임패드 입력이 활성 상태.
  *
- * Story-1-12: 열거형 정의만. 실제 전환 로직은 Story-1-13에서 구현.
  * uint8 기반 — stable integer 보장 (0=Mouse, 1=Gamepad).
  */
 UENUM(BlueprintType)
@@ -58,6 +55,18 @@ enum class EInputMode : uint8
     /** 게임패드 입력 모드 */
     Gamepad = 1
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FOnInputModeChanged — Input 모드 전환 Multicast Delegate
+//
+// Story-1-13 GDD §Formula 1 + §Rule 3:
+//   모드 전환 시 1회 Broadcast. 구독자는 NewMode 인자로 전환된 모드 수신.
+//   Pillar 1: 알림·모달 없음 — delegate 구독자가 UI 커서 전환 등 내부 처리만 수행.
+//
+// 관용 위치: class 외부 global scope (UE 표준 패턴).
+// ─────────────────────────────────────────────────────────────────────────────
+
+DECLARE_MULTICAST_DELEGATE_OneParam(FOnInputModeChanged, EInputMode);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // UMossInputAbstractionSubsystem
@@ -74,8 +83,9 @@ enum class EInputMode : uint8
  * APlayerController가 Initialize 시점에 없을 경우 IMC 등록은 지연됨
  * (Production에서는 PlayerSpawn 이벤트 구독으로 보완 — Story-1-20).
  *
- * Story-1-12(이 파일): 뼈대 선언 + 6 Action + 2 IMC load + IMC 등록.
- * Story-1-13에서 EInputMode auto-detect + OnInputModeChanged delegate 추가 예정.
+ * Story-1-12: 뼈대 선언 + 6 Action + 2 IMC load + IMC 등록.
+ * Story-1-13: EInputMode auto-detect (Formula 1 hysteresis) + FOnInputModeChanged delegate
+ *             + APlayerController::SetShowMouseCursor 모드 연동.
  */
 UCLASS()
 class MADEBYCLAUDECODE_API UMossInputAbstractionSubsystem : public UGameInstanceSubsystem
@@ -93,8 +103,7 @@ public:
     virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 
     /**
-     * IMC 등록 플래그 초기화 + Super 호출.
-     * Story-1-13+에서 delegate 해제 추가 예정.
+     * OnInputModeChanged delegate Clear + IMC 등록 플래그 초기화 + Super 호출.
      */
     virtual void Deinitialize() override;
 
@@ -102,7 +111,7 @@ public:
 
     /**
      * 현재 입력 모드 반환.
-     * Story-1-13 구현 전에는 항상 EInputMode::Mouse.
+     * Story-1-13~: Formula 1 hysteresis auto-detect에 의해 갱신됨.
      */
     EInputMode GetCurrentInputMode() const { return CurrentMode; }
 
@@ -112,6 +121,39 @@ public:
      * false: PlayerController 없거나 에셋 null (Story-1-11 대기 상태).
      */
     bool IsMappingContextRegistered() const { return bMappingContextRegistered; }
+
+    // ── Story-1-13: Input Mode Auto-Detect (Formula 1 Hysteresis) ─────────────
+
+    /**
+     * 마우스 포인터 이동 이벤트 처리 후크.
+     *
+     * Formula 1: ShouldSwitchToMouse = (Delta > InputModeMouseThreshold) AND (CurrentMode == Gamepad)
+     * strict `>` — 3.0px 정확히 이동 시 전환 미발생, 3.001px 초과 시 전환 발생.
+     *
+     * 최초 호출 시 LastMousePosition 초기화만 수행 (위치 확립, 전환 없음).
+     * 이후 호출 시 delta 계산 → Formula 1 판정 → 필요 시 TransitionToMode(Mouse).
+     *
+     * @param NewMousePosition  현재 프레임의 마우스 위치 (화면 좌표계).
+     */
+    void OnMouseMoved(const FVector2D& NewMousePosition);
+
+    /**
+     * 게임패드 입력 수신 이벤트 처리 후크.
+     *
+     * 현재 모드가 Mouse일 때만 TransitionToMode(Gamepad) 호출.
+     * 즉시 전환 (프레임 내, FTimer/Delay 없음) — GDD §Rule 3.
+     */
+    void OnGamepadInputReceived();
+
+    /**
+     * 입력 모드 전환 Multicast Delegate.
+     *
+     * TransitionToMode 내 SetShowMouseCursor 이후 마지막에 Broadcast.
+     * Pillar 1: 알림·모달 없음 — delegate 구독자가 필요한 내부 처리만 수행.
+     *
+     * Subscribe: OnInputModeChanged.AddWeakLambda(this, [](EInputMode NewMode){ ... });
+     */
+    FOnInputModeChanged OnInputModeChanged;
 
     // ── Input Asset References ─────────────────────────────────────────────
     //
@@ -159,7 +201,7 @@ public:
 #if WITH_AUTOMATION_TESTS
     /**
      * [테스트 전용] CurrentMode 강제 설정.
-     * Story-1-13 auto-detect 구현 전 테스트에서 모드 주입 용도.
+     * auto-detect 로직과 독립적으로 모드 주입 용도.
      * @param Mode  설정할 EInputMode 값.
      */
     void TestingSetCurrentMode(EInputMode Mode) { CurrentMode = Mode; }
@@ -178,6 +220,28 @@ public:
      * @param Action      주입할 UInputAction 포인터 (NewObject로 생성).
      */
     void TestingInjectAction(FName ActionName, UInputAction* Action);
+
+    /**
+     * [테스트 전용] LastMousePosition 값 반환.
+     * Formula 1 delta 계산 검증에 사용.
+     */
+    FVector2D TestingGetLastMousePosition() const { return LastMousePosition; }
+
+    /**
+     * [테스트 전용] bMousePositionInitialized 값 반환.
+     * 최초 호출 초기화 경로 검증에 사용.
+     */
+    bool TestingIsMousePositionInitialized() const { return bMousePositionInitialized; }
+
+    /**
+     * [테스트 전용] LastMousePosition + bMousePositionInitialized 리셋.
+     * 테스트 간 독립성 보장을 위해 각 테스트 시작 전 호출.
+     */
+    void TestingResetMousePosition()
+    {
+        bMousePositionInitialized = false;
+        LastMousePosition = FVector2D::ZeroVector;
+    }
 #endif
 
 private:
@@ -197,9 +261,25 @@ private:
      */
     void RegisterMappingContext(APlayerController* PC);
 
+    // ── Story-1-13: Mode Transition ───────────────────────────────────────────
+
+    /**
+     * 입력 모드 전환 내부 처리.
+     *
+     * 1. NewMode == CurrentMode이면 즉시 return (중복 전환 방지 — delegate 미발행).
+     * 2. CurrentMode 갱신.
+     * 3. APlayerController::SetShowMouseCursor 적용 (Mouse=true, Gamepad=false).
+     *    PC null 시 cursor 전환 스킵 (단위 테스트 환경 안전).
+     * 4. OnInputModeChanged.Broadcast(NewMode) — 마지막에 (PC 처리 이후).
+     *
+     * Pillar 1: UI 알림·모달 없음.
+     * @param NewMode  전환할 EInputMode 값.
+     */
+    void TransitionToMode(EInputMode NewMode);
+
     // ── State ─────────────────────────────────────────────────────────────────
 
-    /** 현재 입력 모드. Story-1-13 이전에는 항상 Mouse로 고정. */
+    /** 현재 입력 모드. Formula 1 hysteresis에 의해 갱신됨 (Story-1-13~). */
     EInputMode CurrentMode = EInputMode::Mouse;
 
     /**
@@ -208,4 +288,17 @@ private:
      * Deinitialize에서 false로 리셋.
      */
     bool bMappingContextRegistered = false;
+
+    /**
+     * 이전 프레임의 마우스 위치.
+     * Formula 1 delta 계산 기준점. bMousePositionInitialized == false이면 사용 불가.
+     */
+    FVector2D LastMousePosition = FVector2D::ZeroVector;
+
+    /**
+     * LastMousePosition 초기화 완료 여부.
+     * false: 최초 OnMouseMoved 호출 전 — delta 계산 불가 (기준점 없음).
+     * true: 최초 호출로 LastMousePosition 확립 완료.
+     */
+    bool bMousePositionInitialized = false;
 };

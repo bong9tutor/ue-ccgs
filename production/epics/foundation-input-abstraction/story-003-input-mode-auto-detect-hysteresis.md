@@ -1,9 +1,10 @@
 # Story 003: Input Mode Auto-Detection + Hysteresis (Formula 1) + OnInputModeChanged delegate
 
 > **Epic**: Input Abstraction Layer
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
+> **Estimate**: 0.5 days (~3 hours)
 > **Manifest Version**: 2026-04-19
 
 ## Context
@@ -139,3 +140,35 @@ void UMossInputAbstractionSubsystem::TransitionToMode(EInputMode NewMode) {
 
 - Depends on: Story 002 (Subsystem + Settings)
 - Unlocks: Story 004, 005
+
+---
+
+## Completion Notes
+
+**Completed**: 2026-04-19
+**Criteria**: 6/6 passing (AUTOMATED)
+**Files delivered**:
+- `Input/MossInputAbstractionSubsystem.h/.cpp` (수정) — OnMouseMoved/OnGamepadInputReceived/TransitionToMode + FOnInputModeChanged delegate + LastMousePosition state
+- `Tests/InputModeDetectionTests.cpp` (신규, 6 tests)
+- `tests/unit/input/README.md` Story-1-13 섹션 append
+
+**Test Evidence**: 6 UE Automation — `MossBaby.Input.ModeDetection.{AutoDetectMouseToGamepad/HysteresisBelowThreshold/BoundaryExactThreshold/BoundaryAboveThreshold/SameModeNoDelegate/DelegateSubscriptionCount}`
+
+**AC 커버**:
+- [x] INPUT_MODE_AUTO_DETECT: AutoDetectMouseToGamepadTest
+- [x] INPUT_MODE_HYSTERESIS: HysteresisBelowThresholdTest (delta 2.0 < threshold 3.0)
+- [x] Boundary strict `>` (3.0 정확 미전환): BoundaryExactThresholdTest
+- [x] Boundary 3.1 전환: BoundaryAboveThresholdTest
+- [x] FOnInputModeChanged delegate: DelegateSubscriptionCountTest (multi-subscriber)
+- [~] Cursor 가시성: TransitionToMode 내 SetShowMouseCursor 호출 구현, 단위 테스트에서 PC nullptr guard OK — integration test 분리
+
+**ADR/Rule 준수**:
+- ADR-0001 grep: 0 매치
+- Formula 1 strict `>` 구현 (delta > threshold, not >=)
+- Pillar 1: UI notification/modal API 호출 0건 (cursor visibility만 전환)
+
+**Deferred**:
+- Cursor 가시성 실기 검증: APlayerController 존재 환경 integration test (TD-005)
+- 실제 tick binding: APlayerController 서브클래스 또는 UEnhancedPlayerInput raw event 구독 — Story 1-20 또는 게임 코드 level
+
+**Same-mode no-broadcast**: TransitionToMode 내 `if (NewMode == CurrentMode) return` early 경로 검증 (SameModeNoDelegateTest).

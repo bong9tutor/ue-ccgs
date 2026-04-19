@@ -1,12 +1,13 @@
 // Copyright Moss Baby
 //
-// MossInputAbstractionSubsystem.cpp — Input Abstraction Layer 서브시스템 최소 구현
+// MossInputAbstractionSubsystem.cpp — Input Abstraction Layer 서브시스템 구현
 //
 // Story-1-12: UMossInputAbstractionSubsystem + UMossInputAbstractionSettings + IMC 등록
+// Story-1-13: EInputMode auto-detect (Formula 1 hysteresis) + OnInputModeChanged delegate
+//             + APlayerController::SetShowMouseCursor 전환 (Pillar 1: 알림·모달 없음)
 // ADR-0011: Tuning Knob UDeveloperSettings 채택 참조
-// GDD: design/gdd/input-abstraction-layer.md
+// GDD: design/gdd/input-abstraction-layer.md §Formula 1 / §Rule 3
 //
-// Story-1-13에서 EInputMode auto-detect + OnInputModeChanged delegate 구현 예정.
 // Story-1-17에서 OfferHoldDurationSec Offer Hold Formula 2 연동 구현 예정.
 // Story-1-20에서 PlayerSpawn 이벤트 구독으로 지연된 IMC 등록 보완 예정.
 //
@@ -15,6 +16,7 @@
 //   에셋 생성 후 에디터 재시작(또는 PIE 재실행) 시 자동으로 load 성공.
 
 #include "Input/MossInputAbstractionSubsystem.h"
+#include "Settings/MossInputAbstractionSettings.h"
 #include "Engine/World.h"
 #include "Engine/LocalPlayer.h"
 #include "GameFramework/PlayerController.h"
@@ -95,7 +97,9 @@ void UMossInputAbstractionSubsystem::Initialize(FSubsystemCollectionBase& Collec
 
 void UMossInputAbstractionSubsystem::Deinitialize()
 {
-    // Story-1-13+에서 delegate 해제 추가 예정
+    // Delegate 리스너 전체 해제 — 서브시스템 소멸 시 댕글링 바인딩 방지
+    OnInputModeChanged.Clear();
+
     bMappingContextRegistered = false;
 
     Super::Deinitialize();
@@ -206,6 +210,79 @@ void UMossInputAbstractionSubsystem::RegisterMappingContext(APlayerController* P
             TEXT("[MossInput] No IMC registered — both IMC_MouseKeyboard and IMC_Gamepad are null. "
                  "Story-1-11 에셋 생성 후 PIE 재실행 필요."));
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Story-1-13: Input Mode Auto-Detect (Formula 1 Hysteresis)
+// ─────────────────────────────────────────────────────────────────────────────
+
+void UMossInputAbstractionSubsystem::OnMouseMoved(const FVector2D& NewMousePosition)
+{
+    // 최초 호출: 기준 위치 확립 (delta 계산 불가 — 전환 없음)
+    if (!bMousePositionInitialized)
+    {
+        LastMousePosition = NewMousePosition;
+        bMousePositionInitialized = true;
+        return;
+    }
+
+    const float Delta = (NewMousePosition - LastMousePosition).Size();
+    LastMousePosition = NewMousePosition;
+
+    // Formula 1: strict `>` — 3.0px 정확히 이동 시 전환 미발생, 3.001px 초과 시 전환 발생
+    const UMossInputAbstractionSettings* Settings = UMossInputAbstractionSettings::Get();
+    if (!Settings)
+    {
+        UE_LOG(LogMossInput, Warning,
+            TEXT("[MossInput] OnMouseMoved: UMossInputAbstractionSettings CDO null — 전환 스킵"));
+        return;
+    }
+
+    if (CurrentMode == EInputMode::Gamepad && Delta > Settings->InputModeMouseThreshold)
+    {
+        TransitionToMode(EInputMode::Mouse);
+    }
+}
+
+void UMossInputAbstractionSubsystem::OnGamepadInputReceived()
+{
+    // Mouse 모드일 때만 전환 — Gamepad 모드에서 중복 입력은 no-op
+    if (CurrentMode == EInputMode::Mouse)
+    {
+        TransitionToMode(EInputMode::Gamepad);
+    }
+}
+
+void UMossInputAbstractionSubsystem::TransitionToMode(EInputMode NewMode)
+{
+    // 동일 모드 재진입 방지 — delegate 미발행
+    if (NewMode == CurrentMode)
+    {
+        return;
+    }
+
+    CurrentMode = NewMode;
+
+    // Cursor 가시성 적용 (Pillar 1: 알림·모달 없음 — cursor 전환만)
+    // PC null 허용: 단위 테스트 환경(NewObject 직접 생성) 또는 Initialize 전 호출 시 안전
+    if (UGameInstance* GI = GetGameInstance())
+    {
+        if (UWorld* World = GI->GetWorld())
+        {
+            if (APlayerController* PC = World->GetFirstPlayerController())
+            {
+                PC->SetShowMouseCursor(NewMode == EInputMode::Mouse);
+            }
+        }
+    }
+
+    // Delegate Broadcast — SetShowMouseCursor 이후 마지막에 발행
+    // 구독자가 커서 상태에 의존하는 경우 이미 갱신된 후 수신
+    OnInputModeChanged.Broadcast(NewMode);
+
+    UE_LOG(LogMossInput, Log,
+        TEXT("[MossInput] Mode transition: %s"),
+        NewMode == EInputMode::Mouse ? TEXT("Gamepad → Mouse") : TEXT("Mouse → Gamepad"));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
