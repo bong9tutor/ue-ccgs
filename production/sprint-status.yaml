@@ -6,7 +6,7 @@ goal: "Foundation 4 시스템의 뼈대와 핵심 계약 확립 — Core sprint 
 start: "2026-04-21"
 end: "2026-05-02"
 generated: "2026-04-19"
-updated: "2026-04-19"
+updated: "2026-04-19 (Story 1-1 COMPLETE)"
 
 stories:
   # === Must Have (Critical Path — Foundation skeleton) ===
@@ -15,12 +15,12 @@ stories:
     name: "Time 001 — IMossClockSource + FRealClockSource + FMockClockSource"
     file: "production/epics/foundation-time-session/story-001-clock-source-interface.md"
     priority: must-have
-    status: ready-for-dev
-    owner: ""
+    status: done
+    owner: "unreal-specialist"
     estimate_days: 0.5
     depends_on: []
     blocker: ""
-    completed: ""
+    completed: "2026-04-19"
 
   - id: "1-2"
     name: "Time 002 — FSessionRecord struct + double precision round-trip"

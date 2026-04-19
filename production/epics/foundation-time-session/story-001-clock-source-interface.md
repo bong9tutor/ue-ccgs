@@ -1,9 +1,10 @@
 # Story 001: IMossClockSource 인터페이스 + FRealClockSource + FMockClockSource 구현
 
 > **Epic**: Time & Session System
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
+> **Estimate**: 0.5 days (~3-4 hours)
 > **Manifest Version**: 2026-04-19
 
 ## Context
@@ -113,3 +114,22 @@ private:
 
 - Depends on: None (Foundation 첫 story — 다른 Foundation epic과 독립)
 - Unlocks: Story 002 (FSessionRecord), Story 003 (Subsystem 뼈대)
+
+---
+
+## Completion Notes
+
+**Completed**: 2026-04-19
+**Criteria**: 3/3 passing (AC-001 / AC-002 / AC-003 모두 COVERED)
+**Files delivered**:
+- `MadeByClaudeCode/Source/MadeByClaudeCode/Time/MossClockSource.h` (신규, 106 lines)
+- `MadeByClaudeCode/Source/MadeByClaudeCode/Tests/ClockSourceTests.cpp` (신규, 166 lines, 5 tests)
+- `tests/unit/time-session/README.md` (CCGS evidence 인덱스)
+**Test Evidence**: Logic — UE Automation 테스트 5건 (`MossBaby.Time.ClockSource.*`). 실행 검증은 CI/Editor에서.
+**Code Review**: Complete (`/code-review` — APPROVED WITH SUGGESTIONS, unreal-specialist + qa-tester 병렬)
+**ADR-0001 준수**: 금지 패턴 grep 0 매치. `FDateTime::UtcNow` / `FPlatformTime::Seconds` 직접 호출은 `FRealClockSource` 내부만.
+**Deviations**:
+- **ADVISORY**: Test file 경로 매핑 — story가 명시한 `tests/unit/time-session/clock_source_test.cpp` 대신 UE 빌드 제약상 `Source/.../Tests/ClockSourceTests.cpp`에 배치. `tests/unit/time-session/README.md`가 포인터 역할.
+- **ADVISORY (S3 잠재)**: `FClockSourceRealUtcDiffNonNegativeTest` NTP 보정 시 간헐 실패 가능 (연속 호출이라 확률 극저). tech-debt 등록.
+- **ADVISORY (문서 갭)**: `.claude/rules/test-standards.md` 네이밍 규칙이 UE `IMPLEMENT_SIMPLE_AUTOMATION_TEST` idiom 예외를 명시하지 않음. qa-lead 에스컬레이션 권장. tech-debt 등록.
+**Deferred**: OQ-IMP-1 Windows suspend/resume 실기 검증 (Story-001 Out of Scope; 별도 Sprint 2 task).

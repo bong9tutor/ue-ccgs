@@ -1,0 +1,348 @@
+# Technical Requirement (TR) Registry
+#
+# 모든 GDD 기술 요구사항의 정식 ID 인덱스.
+# `/dev-story`, `/story-readiness`, `/architecture-review` 스킬이 참조.
+#
+# Source of truth: docs/architecture/architecture-traceability.md
+# 이 파일은 traceability index의 yaml mirror.
+# traceability 변경 시 `/architecture-review`가 이 파일을 재생성.
+
+last_updated: 2026-04-19
+schema_version: 1
+source: docs/architecture/architecture-traceability.md
+
+coverage_summary:
+  covered: 30
+  partial: 0
+  gap: 0
+  total: 30
+  percentage: 100
+
+# ----------------------------------------------------------------------------
+# Foundation Layer — 10 TRs
+# ----------------------------------------------------------------------------
+
+requirements:
+
+  - id: TR-time-001
+    gdd: time-session-system.md
+    system: Time & Session
+    layer: Foundation
+    requirement: "NO_FORWARD_TAMPER_DETECTION_ADR AC — forward time tamper 명시적 수용 정책 CI grep 검증"
+    adrs: [ADR-0001]
+    status: active
+    coverage: covered
+
+  - id: TR-time-002
+    gdd: time-session-system.md
+    system: Time & Session
+    layer: Foundation
+    requirement: "OQ-5 UDeveloperSettings knob exposure — Time/Session tuning knob 사용자 노출"
+    adrs: [ADR-0011]
+    status: active
+    coverage: covered
+
+  - id: TR-time-003
+    gdd: time-session-system.md
+    system: Time & Session
+    layer: Foundation
+    requirement: "IMossClockSource injection seam — 모든 시간 입력이 인터페이스 경유, production(FRealClockSource)/test(FMockClockSource) 교체 가능"
+    adrs: []
+    notes: "GDD contract — 인터페이스 계약은 ADR-0001의 전제지만 별도 ADR은 없음"
+    status: active
+    coverage: covered
+
+  - id: TR-time-004
+    gdd: time-session-system.md
+    system: Time & Session
+    layer: Foundation
+    requirement: "Windows suspend/resume behaviour — FPlatformTime::Seconds() 드라이버 의존 실기 검증"
+    adrs: []
+    notes: "OQ-IMP-1 Implementation task — Win10/11 2대 실기 검증"
+    status: active
+    coverage: covered
+
+  - id: TR-dp-001
+    gdd: data-pipeline.md
+    system: Data Pipeline
+    layer: Foundation
+    requirement: "OQ-ADR-1 container selection — UPrimaryDataAsset + DataTable 컨테이너"
+    adrs: [ADR-0002]
+    status: active
+    coverage: covered
+
+  - id: TR-dp-002
+    gdd: data-pipeline.md
+    system: Data Pipeline
+    layer: Foundation
+    requirement: "OQ-ADR-2 loading strategy — Sync bundle load at GameInstance::Init"
+    adrs: [ADR-0003]
+    status: active
+    coverage: covered
+
+  - id: TR-dp-003
+    gdd: data-pipeline.md
+    system: Data Pipeline
+    layer: Foundation
+    requirement: "UMossFinalFormAsset TMap editing (CR-8) — FFinalFormRow UPrimaryDataAsset 저장 포맷"
+    adrs: [ADR-0010]
+    status: active
+    coverage: covered
+
+  - id: TR-dp-004
+    gdd: data-pipeline.md
+    system: Data Pipeline
+    layer: Foundation
+    requirement: "AC-DP-18 [5.6-VERIFY] PrimaryAssetTypesToScan cooked — DefaultEngine.ini 스캔 + Cooked 빌드 실기"
+    adrs: [ADR-0002, ADR-0010]
+    status: active
+    coverage: covered
+    verify: "5.6-VERIFY"
+
+  - id: TR-save-001
+    gdd: save-load-persistence.md
+    system: Save/Load
+    layer: Foundation
+    requirement: "OQ-8 compound event sequence atomicity — Day 13 scenario의 compound event 원자성"
+    adrs: [ADR-0009]
+    notes: "P1 — Day 13 compound event 시나리오 발생 시 검증"
+    status: active
+    coverage: covered
+    deferred_to: "Day 13 scenario"
+
+  - id: TR-input-001
+    gdd: input-abstraction-layer.md
+    system: Input Abstraction
+    layer: Foundation
+    requirement: "Gamepad drag alternative (OQ-2) — 카드 드래그의 게임패드 대안 입력"
+    adrs: []
+    notes: "VS concern — Vertical Slice 진입 시 설계"
+    status: active
+    coverage: covered
+
+# ----------------------------------------------------------------------------
+# Core Layer — 8 TRs
+# ----------------------------------------------------------------------------
+
+  - id: TR-gsm-001
+    gdd: game-state-machine.md
+    system: Game State Machine
+    layer: Core
+    requirement: "OQ-6 MPC ↔ Light Actor sync (BLOCKING) — MPC 단독 또는 Hybrid 동기화 결정"
+    adrs: [ADR-0004]
+    status: active
+    coverage: covered
+
+  - id: TR-gsm-002
+    gdd: game-state-machine.md
+    system: Game State Machine
+    layer: Core
+    requirement: "MPC writer uniqueness (AC-LDS-06) — 단일 writer 불변식"
+    adrs: [ADR-0004]
+    notes: "architecture.md §Cross-Layer 추가 보강"
+    status: active
+    coverage: covered
+
+  - id: TR-gsm-003
+    gdd: game-state-machine.md
+    system: Game State Machine
+    layer: Core
+    requirement: "bWithered persistence + MPC path — Withered 상태 세이브 왕복 + MPC 반영"
+    adrs: []
+    notes: "GDD contract"
+    status: active
+    coverage: covered
+
+  - id: TR-gsm-004
+    gdd: game-state-machine.md
+    system: Game State Machine
+    layer: Core
+    requirement: "E12 Time vs Load ordering — GameInstance::Init 순서 보장"
+    adrs: []
+    notes: "AC-GSM-15 (GDD 내재)"
+    status: active
+    coverage: covered
+
+  - id: TR-mbc-001
+    gdd: moss-baby-character-system.md
+    system: Moss Baby Character
+    layer: Core
+    requirement: "Material param literal ban (AC-MBC-03) — 머티리얼 파라미터 리터럴 금지, Preset asset 사용"
+    adrs: []
+    notes: "GDD Preset asset 계약"
+    status: active
+    coverage: covered
+
+  - id: TR-mbc-002
+    gdd: moss-baby-character-system.md
+    system: Moss Baby Character
+    layer: Core
+    requirement: "Priority — FinalReveal > GrowthTransition > Reacting > Drying > Idle 우선순위"
+    adrs: []
+    notes: "GDD contract"
+    status: active
+    coverage: covered
+
+  - id: TR-lumen-001
+    gdd: lumen-dusk-scene.md
+    system: Lumen Dusk Scene
+    layer: Core
+    requirement: "HIGH risk Lumen HWRT + PSO — Lumen HWRT 설정 + PSO Precaching 전략"
+    adrs: [ADR-0004, ADR-0013]
+    status: active
+    coverage: covered
+    verify: "5.6-VERIFY"
+    risk: HIGH
+
+  - id: TR-lumen-002
+    gdd: lumen-dusk-scene.md
+    system: Lumen Dusk Scene
+    layer: Core
+    requirement: "Farewell → Any transition ban — Farewell 상태 이탈 금지"
+    adrs: []
+    notes: "architecture.md §Cross-Layer + AC-GSM-05 (GDD)"
+    status: active
+    coverage: covered
+
+# ----------------------------------------------------------------------------
+# Feature Layer — 8 TRs
+# ----------------------------------------------------------------------------
+
+  - id: TR-card-001
+    gdd: card-system.md
+    system: Card System
+    layer: Feature
+    requirement: "OQ-CS-3 FOnCardOffered order (BLOCKING) — 2-Stage delegate 처리 순서 결정"
+    adrs: [ADR-0005]
+    status: active
+    coverage: covered
+
+  - id: TR-card-002
+    gdd: card-system.md
+    system: Card System
+    layer: Feature
+    requirement: "OQ-CS-2 GetLastCardDay() API — int32 sentinel 0 API 계약"
+    adrs: [ADR-0012]
+    status: active
+    coverage: covered
+
+  - id: TR-card-003
+    gdd: card-system.md
+    system: Card System
+    layer: Feature
+    requirement: "OQ-CS-5 card pool Eager vs Lazy — Eager 재생성 결정"
+    adrs: [ADR-0006]
+    status: active
+    coverage: covered
+
+  - id: TR-card-004
+    gdd: card-system.md
+    system: Card System
+    layer: Feature
+    requirement: "FGuid → FName migration — 카드 ID 타입 결정"
+    adrs: []
+    notes: "cross-review D-1 (RESOLVED 2026-04-18)"
+    status: active
+    coverage: covered
+
+  - id: TR-growth-001
+    gdd: growth-accumulation-engine.md
+    system: Growth Accumulation Engine
+    layer: Feature
+    requirement: "CR-1 atomicity — 태그 누적 원자성 보장"
+    adrs: []
+    notes: "AC-GAE-02 (GDD 내재)"
+    status: active
+    coverage: covered
+
+  - id: TR-growth-002
+    gdd: growth-accumulation-engine.md
+    system: Growth Accumulation Engine
+    layer: Feature
+    requirement: "CR-8 FFinalFormRow storage — UPrimaryDataAsset 기반 최종 형태 저장"
+    adrs: [ADR-0010]
+    status: active
+    coverage: covered
+
+  - id: TR-dream-001
+    gdd: dream-trigger-system.md
+    system: Dream Trigger
+    layer: Feature
+    requirement: "OQ-DTS-1 PendingDreamId retry UX — 꿈 트리거 재시도 사용자 경험"
+    adrs: []
+    notes: "GDD §E5"
+    status: active
+    coverage: covered
+
+  - id: TR-stillness-001
+    gdd: stillness-budget.md
+    system: Stillness Budget
+    layer: Feature
+    requirement: "OQ-1 Sound Concurrency integration — Stillness ↔ UE Sound Concurrency Hybrid"
+    adrs: [ADR-0007]
+    notes: "P1 — VS Audio System sprint 진입 시"
+    status: active
+    coverage: covered
+    deferred_to: "VS Audio System sprint"
+
+# ----------------------------------------------------------------------------
+# Presentation Layer — 2 TRs
+# ----------------------------------------------------------------------------
+
+  - id: TR-chu-001
+    gdd: card-hand-ui.md
+    system: Card Hand UI
+    layer: Presentation
+    requirement: "OQ-CHU-1 UMG drag implementation — Enhanced Input subscription 기반 드래그"
+    adrs: [ADR-0008]
+    notes: "P1 — Card Hand UI sprint 진입 시"
+    status: active
+    coverage: covered
+    deferred_to: "Card Hand UI sprint"
+
+  - id: TR-dj-001
+    gdd: dream-journal-ui.md
+    system: Dream Journal UI
+    layer: Presentation
+    requirement: "SaveAsync direct-call ban (AC-DJ-17) — UI가 SaveAsync 직접 호출 금지"
+    adrs: []
+    notes: "architecture.md §Cross-Layer + GDD"
+    status: active
+    coverage: covered
+
+# ----------------------------------------------------------------------------
+# Meta Layer — 2 TRs
+# ----------------------------------------------------------------------------
+
+  - id: TR-window-001
+    gdd: window-display-management.md
+    system: Window & Display
+    layer: Meta
+    requirement: "Steam Deck Proton (OQ-IMP-5) — SetWindowPos(HWND_TOPMOST) Proton 동작 실기"
+    adrs: []
+    notes: "Implementation task — Steam Deck 실기 검증"
+    status: active
+    coverage: covered
+
+  - id: TR-window-002
+    gdd: window-display-management.md
+    system: Window & Display
+    layer: Meta
+    requirement: "UDeveloperSettings knob exposure — Window/Display tuning knob 사용자 노출"
+    adrs: [ADR-0011]
+    status: active
+    coverage: covered
+
+# ----------------------------------------------------------------------------
+# Registry maintenance
+# ----------------------------------------------------------------------------
+
+maintenance:
+  regeneration_trigger:
+    - "/architecture-review 실행 후 Coverage Summary 변경 시"
+    - "GDD의 신규 TR-ID 추가 시 (/propagate-design-change)"
+    - "ADR status 변경 시 (Proposed → Accepted)"
+  validation:
+    - "status 값: active | deprecated | superseded-by:<new-id>"
+    - "coverage 값: covered | partial | gap"
+    - "adrs 리스트: 실제 Accepted ADR 파일 존재 확인"
