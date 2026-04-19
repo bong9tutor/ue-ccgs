@@ -6,7 +6,7 @@ goal: "Foundation 4 시스템의 뼈대와 핵심 계약 확립 — Core sprint 
 start: "2026-04-21"
 end: "2026-05-02"
 generated: "2026-04-19"
-updated: "2026-04-19 (Story 1-1~1-9 COMPLETE)"
+updated: "2026-04-19 (Story 1-1~1-10 COMPLETE — Save/Load epic 완성)"
 
 stories:
   # === Must Have (Critical Path — Foundation skeleton) ===
@@ -114,12 +114,12 @@ stories:
     name: "Save/Load 004 — FMossSaveSnapshot POD + Atomic write + Ping-pong"
     file: "production/epics/foundation-save-load/story-004-atomic-write-snapshot.md"
     priority: must-have
-    status: backlog
-    owner: ""
+    status: done
+    owner: "unreal-specialist"
     estimate_days: 0.5
     depends_on: ["1-9"]
     blocker: ""
-    completed: ""
+    completed: "2026-04-19"
 
   - id: "1-11"
     name: "Input 001 — 6 Input Actions + 2 IMC assets"

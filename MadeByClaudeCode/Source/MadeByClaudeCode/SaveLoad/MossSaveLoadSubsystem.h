@@ -32,9 +32,11 @@
 //   Compound event sequence atomicity = GSM BeginCompoundEvent/EndCompoundEvent 책임
 //
 // Story 1-8 Out of Scope:
-//   - Atomic write + dual-slot (Story 1-10)
 //   - T1 GameViewport World* 실제 바인딩 (Story 1-20 또는 게임 코드)
-//   - AC E23 TFuture 실제 대기 (Story 1-10)
+//   - AC E23 TFuture 실제 대기 (Story 1-10 에서 동기 경로로 구현 완료. 실제 비동기 위임은 추후)
+// Story 1-10 포함:
+//   - WriteSlotAtomic: atomic write helper (Step 4-9)
+//   - SaveAsync: 실제 atomic write 경로 교체 (Step 1-10)
 
 #pragma once
 #include "CoreMinimal.h"
@@ -42,6 +44,7 @@
 #include "HAL/ThreadSafeBool.h"
 #include "SaveLoad/MossSaveData.h"
 #include "SaveLoad/MossSaveHeader.h"
+#include "SaveLoad/MossSaveSnapshot.h"
 #include "MossSaveLoadSubsystem.generated.h"
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -279,6 +282,23 @@ public:
     void TestingSetActiveSlot(TCHAR Slot) { ActiveSlot = Slot; }
 
     /**
+     * [테스트 전용] SaveData 강제 설정.
+     * Initialize() 미호출 시 WriteSlotAtomic 테스트에서 데이터 주입용.
+     * 프로덕션 코드에서 절대 호출 금지.
+     */
+    void TestingSetSaveData(UMossSaveData* InData) { SaveData = InData; }
+
+    /**
+     * [테스트 전용] WriteSlotAtomic 직접 호출.
+     * 단일 슬롯 원자 쓰기 경로 테스트용.
+     * 프로덕션 코드에서 절대 호출 금지.
+     */
+    bool TestingWriteSlotAtomic(TCHAR TargetSlot, const FMossSaveSnapshot& Snapshot, uint32 NextWSN)
+    {
+        return WriteSlotAtomic(TargetSlot, Snapshot, NextWSN);
+    }
+
+    /**
      * [테스트 전용] ReadSlot 직접 호출.
      * 단일 슬롯 유효성 검증 경로 테스트용.
      * 프로덕션 코드에서 절대 호출 금지.
@@ -304,6 +324,27 @@ private:
      * @return            6조건 모두 통과 시 true
      */
     bool ReadSlot(const FString& Path, FMossSaveHeader& OutHeader, TArray<uint8>& OutPayload) const;
+
+    // ── Write Helpers (Story 1-10) ─────────────────────────────────────────────
+
+    /**
+     * 단일 슬롯 원자 쓰기 (Story 1-10, Step 4-9).
+     *
+     * Step 4: Snapshot → Payload bytes (FMemoryWriter + StaticStruct::SerializeItem).
+     * Step 5: CRC32 (seed=0) 계산.
+     * Step 6: FMossSaveHeader 구성 (Magic/Version/WSN/PayloadLen/CRC).
+     * Step 7: Header + Payload 연결 → FullBuffer.
+     * Step 8: .tmp 파일 쓰기 (FFileHelper::SaveArrayToFile).
+     * Step 9: .tmp → .sav MoveFile (IPlatformFile::MoveFile).
+     * MaxPayloadBytes 초과 시 Error 로그 + false 반환.
+     * MoveFile 실패 시 Warning 로그 + false 반환.
+     *
+     * @param TargetSlot  'A' 또는 'B'
+     * @param Snapshot    game thread에서 복사된 POD 구조체
+     * @param NextWSN     ComputeNextWSN() 반환값
+     * @return            모든 단계 성공 시 true
+     */
+    bool WriteSlotAtomic(TCHAR TargetSlot, const FMossSaveSnapshot& Snapshot, uint32 NextWSN);
 
     // ── Trigger Handlers ──────────────────────────────────────────────────────
 

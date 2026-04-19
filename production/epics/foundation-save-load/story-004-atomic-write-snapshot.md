@@ -1,9 +1,10 @@
 # Story 004: FMossSaveSnapshot POD + Atomic write (Step 2-10) + Ping-pong rename + E4 temp crash recovery
 
 > **Epic**: Save/Load Persistence
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
+> **Estimate**: 0.5 days (~4 hours)
 > **Manifest Version**: 2026-04-19
 
 ## Context
@@ -188,3 +189,41 @@ FString UMossSaveLoadSubsystem::GetSlotPath(TCHAR Slot) const {
 
 - Depends on: Story 003 (Header + Formula 1-3)
 - Unlocks: Story 005, 006
+
+---
+
+## Completion Notes
+
+**Completed**: 2026-04-19
+**Criteria**: 4/6 AUTOMATED + 2 CODE_REVIEW 완료, 2 deferred (E4 crash recovery, MaxPayloadBytes mutable)
+
+**Files delivered**:
+- `SaveLoad/MossSaveSnapshot.h` (신규) — POD USTRUCT + `UObject.h` include 금지 (POD-only guard)
+- `SaveLoad/MossSaveSnapshot.cpp` (신규) — `MakeSnapshotFromSaveData` free function (UMossSaveData include 격리)
+- `SaveLoad/MossSaveLoadSubsystem.h/.cpp` (수정) — SaveAsync 교체(Step 1-10) + WriteSlotAtomic 구현 + Testing 훅 확장
+- `Tests/MossSaveAtomicWriteTests.cpp` (신규, 4 tests)
+- `tests/unit/save-load/README.md` (Story 1-10 섹션 append)
+
+**Test Evidence**: 4 UE Automation — `MossBaby.SaveLoad.AtomicWrite.{SnapshotFactory/NoTmpRemains/PingPongSlotSelect/RoundTripHeaderCrc}`. 각 테스트 `CleanupTestSaveFiles()` 전후 실행.
+
+**AC 커버**:
+- [x] FMossSaveSnapshot POD factory → SnapshotFactoryTest
+- [x] ATOMIC_PINGPONG (unit level) → PingPongSlotSelectTest
+- [x] ATOMIC_RENAME_NO_TMP_REMAINS → NoTmpRemainsTest
+- [x] Header round-trip + CRC → RoundTripHeaderCrcTest
+- [x] NO_SLOT_UTIL_SAVETOFILE → grep 0 매치 검증 (README 명령 + 실제 grep 결과)
+- [x] POD-only guard → MossSaveSnapshot.h에 UObject.h include 0건
+
+**ADR/Rule 준수**:
+- ADR-0001 grep: 0 매치
+- `UGameplayStatics::SaveGameToSlot`/`LoadGameFromSlot` grep: 0 매치
+- `IPlatformFile::MoveFile` 사용 (IFileManager::Move 미사용)
+- `FCrc::MemCrc32(seed=0)` 준수
+- `MaxPayloadBytes` 체크 구현
+
+**Deferred**:
+- E4_TEMP_CRASH_RECOVERY: process kill mid-write 필요 → integration test 환경
+- MaxPayloadBytes reject 테스트: Settings CDO mutable 주입 까다로움 → integration test
+- Async TFuture 위임: 뼈대는 동기 실행 (AC E22/E23 실측을 위해 Story 1-20 또는 별도)
+
+**Integration test TD-005**: Initialize→LoadInitial→SaveAsync→atomic write→ActiveSlot 전환 전체 경로 (UGameInstance lifecycle 포함)

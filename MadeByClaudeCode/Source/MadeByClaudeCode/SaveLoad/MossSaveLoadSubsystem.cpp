@@ -31,10 +31,14 @@
 //   - T1 UGameViewportClient::CloseRequested UWorld* 실제 바인딩
 
 #include "SaveLoad/MossSaveLoadSubsystem.h"
+#include "SaveLoad/MossSaveSnapshot.h"
+#include "SaveLoad/MossSaveHeader.h"
 #include "Settings/MossSaveLoadSettings.h"
 #include "Framework/Application/SlateApplication.h"
 #include "Misc/CoreDelegates.h"
 #include "Misc/FileHelper.h"
+#include "HAL/PlatformFileManager.h"
+#include "HAL/FileManager.h"
 #include "Misc/Paths.h"
 #include "HAL/PlatformProcess.h"
 #include "Misc/Crc.h"
@@ -127,51 +131,59 @@ void UMossSaveLoadSubsystem::Deinitialize()
 
 void UMossSaveLoadSubsystem::SaveAsync(ESaveReason Reason)
 {
-    // AC E19: Loading 상태 — silent drop + 진단 로그 "drop"
     if (State == ESaveLoadState::Loading)
     {
-        UE_LOG(LogMossSaveLoad, Verbose,
-            TEXT("drop — Loading state (AC E19): reason=%s"),
-            *UEnum::GetValueAsString(Reason));
+        UE_LOG(LogMossSaveLoad, Verbose, TEXT("drop — Loading state (AC E19)"));
         return;
     }
-
-    // AC E20/E22: Saving 또는 Migrating 상태 — coalesce (최신 reason 승리)
-    if (State == ESaveLoadState::Saving || State == ESaveLoadState::Migrating)
+    if (State == ESaveLoadState::Migrating || State == ESaveLoadState::Saving)
     {
-        const FString PrevReason = PendingSaveReason.IsSet()
-            ? UEnum::GetValueAsString(PendingSaveReason.GetValue())
-            : TEXT("(없음)");
-
         PendingSaveReason = Reason;
-
-        UE_LOG(LogMossSaveLoad, Verbose,
-            TEXT("coalesce — %s 상태 중 reason=%s (이전 pending=%s, 최신 승리)"),
-            *UEnum::GetValueAsString(State),
-            *UEnum::GetValueAsString(Reason),
-            *PrevReason);
+        UE_LOG(LogMossSaveLoad, Verbose, TEXT("coalesce during %s"), *UEnum::GetValueAsString(State));
         return;
     }
 
-    // Idle → Saving 전이
     State = ESaveLoadState::Saving;
+    if (SaveData) { SaveData->LastSaveReason = UEnum::GetValueAsString(Reason); }
 
-    if (SaveData)
+    // Step 1: Snapshot (game thread)
+    const FMossSaveSnapshot Snapshot = SaveData
+        ? MakeSnapshotFromSaveData(*SaveData)
+        : FMossSaveSnapshot{};
+
+    // Step 2: Target slot (ping-pong, FreshStart → A)
+    const TCHAR TargetSlot = (ActiveSlot == TEXT('A')) ? TEXT('B') : TEXT('A');
+
+    // Step 3: NextWSN
+    const uint32 NextWSN = ComputeNextWSN();
+
+    // Step 4-9: 동기 실행 (Story 1-20 Async 구현 defer)
+    const bool bSuccess = WriteSlotAtomic(TargetSlot, Snapshot, NextWSN);
+
+    if (bSuccess)
     {
-        SaveData->LastSaveReason = UEnum::GetValueAsString(Reason);
+        ActiveSlot = TargetSlot;
+        IOCommitCount++;
+
+        // Step 10: 반대 슬롯 .tmp cleanup (best-effort)
+        const TCHAR OtherSlot = (TargetSlot == TEXT('A')) ? TEXT('B') : TEXT('A');
+        const FString OtherTmp = GetSlotPath(OtherSlot) + TEXT(".tmp");
+        IFileManager::Get().Delete(*OtherTmp, /*RequireExists=*/false);
+    }
+    else
+    {
+        UE_LOG(LogMossSaveLoad, Warning, TEXT("WriteSlotAtomic failed for slot %c"), TargetSlot);
     }
 
-    // 뼈대: I/O commit 카운트 증가 (실제 atomic write는 Story 1-10에서 구현)
-    IOCommitCount++;
+    State = ESaveLoadState::Idle;
 
-    UE_LOG(LogMossSaveLoad, Verbose,
-        TEXT("SaveAsync 진입 — reason=%s, IOCommitCount=%d (뼈대 동기 시뮬레이션)"),
-        *UEnum::GetValueAsString(Reason), IOCommitCount);
-
-    // 뼈대: 동기 완료 시뮬레이션 — 실제 worker thread TFuture 위임은 Story 1-10
-    // Story 1-10: Async(EAsyncExecution::ThreadPool, [this]() { snapshot + atomic write })
-    //             완료 후 game thread에서 OnSaveTaskComplete() 콜백
-    OnSaveTaskComplete();
+    // Pending coalesced save 즉시 commit
+    if (PendingSaveReason.IsSet())
+    {
+        const ESaveReason Next = PendingSaveReason.GetValue();
+        PendingSaveReason.Reset();
+        SaveAsync(Next);
+    }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -306,4 +318,77 @@ void UMossSaveLoadSubsystem::OnEngineExit()
     // FThreadSafeBool bDeinitFlushInProgress가 thread-safe 재진입 차단 보장
     UE_LOG(LogMossSaveLoad, Log, TEXT("T3 EngineExit — FlushAndDeinit 호출"));
     FlushAndDeinit();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// WriteSlotAtomic (Story 1-10, Step 4-9)
+// ─────────────────────────────────────────────────────────────────────────────
+
+bool UMossSaveLoadSubsystem::WriteSlotAtomic(TCHAR TargetSlot, const FMossSaveSnapshot& Snapshot, uint32 NextWSN)
+{
+    // Step 4: Serialize snapshot → Payload bytes
+    TArray<uint8> Payload;
+    {
+        FMemoryWriter Writer(Payload, /*bIsPersistent=*/true);
+        FMossSaveSnapshot MutableCopy = Snapshot;
+        UScriptStruct* Struct = FMossSaveSnapshot::StaticStruct();
+        Struct->SerializeItem(Writer, &MutableCopy, nullptr);
+        if (Writer.IsError())
+        {
+            UE_LOG(LogMossSaveLoad, Warning, TEXT("Snapshot serialize error"));
+            return false;
+        }
+    }
+
+    // MaxPayloadBytes 체크
+    const auto* Settings = UMossSaveLoadSettings::Get();
+    if (Settings && Payload.Num() > Settings->MaxPayloadBytes)
+    {
+        UE_LOG(LogMossSaveLoad, Error, TEXT("Payload size %d exceeds MaxPayloadBytes %d"),
+            Payload.Num(), Settings->MaxPayloadBytes);
+        return false;
+    }
+
+    // Step 5: CRC32 seed=0
+    const uint32 Crc = FCrc::MemCrc32(Payload.GetData(), Payload.Num(), 0);
+
+    // Step 6: Header
+    FMossSaveHeader Header;
+    Header.SaveSchemaVersion = Snapshot.SaveSchemaVersion > 0
+        ? Snapshot.SaveSchemaVersion
+        : UMossSaveData::CURRENT_SCHEMA_VERSION;
+    Header.WriteSeqNumber    = NextWSN;
+    Header.PayloadByteLength = static_cast<uint32>(Payload.Num());
+    Header.PayloadCrc32      = Crc;
+
+    // Step 7: Full buffer = Header + Payload
+    TArray<uint8> FullBuffer;
+    Header.SerializeToBuffer(FullBuffer);
+    FullBuffer.Append(Payload);
+
+    // Step 8: Temp write (directory 보장)
+    const FString FinalPath = GetSlotPath(TargetSlot);
+    const FString TempPath  = FinalPath + TEXT(".tmp");
+    const FString DirPath   = FPaths::GetPath(FinalPath);
+    IFileManager::Get().MakeDirectory(*DirPath, /*Tree=*/true);
+
+    if (!FFileHelper::SaveArrayToFile(FullBuffer, *TempPath))
+    {
+        UE_LOG(LogMossSaveLoad, Warning, TEXT("SaveArrayToFile failed: %s"), *TempPath);
+        return false;
+    }
+
+    // Step 9: Atomic rename (Windows NTFS)
+    IPlatformFile& PF = FPlatformFileManager::Get().GetPlatformFile();
+    if (PF.FileExists(*FinalPath))
+    {
+        PF.DeleteFile(*FinalPath); // 기존 파일 삭제 후 MoveFile
+    }
+    if (!PF.MoveFile(*FinalPath, *TempPath))
+    {
+        UE_LOG(LogMossSaveLoad, Warning, TEXT("MoveFile failed: %s -> %s"), *TempPath, *FinalPath);
+        return false;
+    }
+
+    return true;
 }

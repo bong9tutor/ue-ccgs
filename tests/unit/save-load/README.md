@@ -126,13 +126,71 @@ UnrealEditor-Cmd.exe MadeByClaudeCode.uproject \
 
 ---
 
+---
+
+## Story 1-10 — Atomic write + Ping-pong
+
+- 실제 cpp: `MadeByClaudeCode/Source/MadeByClaudeCode/Tests/MossSaveAtomicWriteTests.cpp`
+- 카테고리: `MossBaby.SaveLoad.AtomicWrite.*`
+
+### 테스트 함수 목록
+
+| 함수명 | 카테고리 | AC |
+|--------|----------|----|
+| `FMossSaveSnapshotFactoryTest` | `MossBaby.SaveLoad.AtomicWrite.SnapshotFactory` | POD factory 필드 복사 |
+| `FMossSaveAtomicRenameNoTmpTest` | `MossBaby.SaveLoad.AtomicWrite.NoTmpRemains` | ATOMIC_RENAME_NO_TMP_REMAINS |
+| `FMossSavePingPongSlotSelectTest` | `MossBaby.SaveLoad.AtomicWrite.PingPongSlotSelect` | ATOMIC_PINGPONG |
+| `FMossSaveRoundTripHeaderCrcTest` | `MossBaby.SaveLoad.AtomicWrite.RoundTripHeaderCrc` | Header round-trip + CRC |
+
+### AC 매핑
+
+| AC | 설명 | 검증 방식 | 테스트 함수 |
+|----|------|-----------|-------------|
+| FMossSaveSnapshot POD factory | `MakeSnapshotFromSaveData` — 필드 3개(SessionRecord, SaveSchemaVersion, LastSaveReason) 정확 복사 | AUTOMATED | `FMossSaveSnapshotFactoryTest` |
+| ATOMIC_PINGPONG | ActiveSlot=A → 다음 write는 B, B 슬롯 생성 확인 | AUTOMATED | `FMossSavePingPongSlotSelectTest` |
+| ATOMIC_RENAME_NO_TMP_REMAINS | WriteSlotAtomic 후 .tmp 파일 부재 확인 | AUTOMATED | `FMossSaveAtomicRenameNoTmpTest` |
+| Header round-trip + CRC | WriteSlotAtomic → TestingReadSlot: WSN·SchemaVersion 일치 + CRC 검증 통과 | AUTOMATED | `FMossSaveRoundTripHeaderCrcTest` |
+| NO_SLOT_UTIL_SAVETOFILE | `SaveGameToSlot` / `LoadGameFromSlot` 미사용 | CODE_REVIEW | `grep -r "SaveGameToSlot\|LoadGameFromSlot" MadeByClaudeCode/Source/MadeByClaudeCode/` → 0 매치 기대 |
+| POD-only guard | `MossSaveSnapshot.h`에 `UObject.h` 미include | CODE_REVIEW | `grep "UObject.h\|UObject/UObject.h" MadeByClaudeCode/Source/MadeByClaudeCode/SaveLoad/MossSaveSnapshot.h` → 0 매치 기대 |
+
+### Deferred (이 Story 범위 밖)
+
+| 항목 | 이유 |
+|------|------|
+| E4_TEMP_CRASH_RECOVERY | process kill mid-write 필요 — integration test 환경에서만 검증 가능 |
+| MaxPayloadBytes reject 테스트 | Settings CDO mutable 주입 복잡 — 별도 integration 스토리에서 처리 |
+| 실제 worker thread TFuture 위임 | Story 1-20 Async 구현 defer |
+
+### 테스트 후 cleanup
+
+각 테스트 시작·종료 시 `CleanupTestSaveFiles()` 헬퍼 호출:
+생성된 `.sav` / `.tmp` 파일을 `IFileManager::Delete`로 제거.
+
+### 실행 명령 (headless)
+
+```bash
+UnrealEditor-Cmd.exe MadeByClaudeCode.uproject \
+  -ExecCmds="Automation RunTests MossBaby.SaveLoad.AtomicWrite.; Quit" \
+  -nullrhi -nosound -log -unattended
+```
+
+전체 SaveLoad epic 테스트:
+
+```bash
+UnrealEditor-Cmd.exe MadeByClaudeCode.uproject \
+  -ExecCmds="Automation RunTests MossBaby.SaveLoad.; Quit" \
+  -nullrhi -nosound -log -unattended
+```
+
+---
+
 ## 미구현 스토리 (Out of Scope)
 
 | Story | 내용 | 상태 |
 |-------|------|------|
-| Story 1-9 | Header block struct + CRC32 + Formula 1-3 | 미시작 |
-| Story 1-10 | Atomic write + dual-slot | 미시작 |
+| Story 1-16 | Migration chain (Formula 4) | 미시작 |
+| Story 1-20 | Async TFuture worker thread 위임 + T1 viewport 실제 바인딩 | 미시작 |
 
 ---
 
-*최종 업데이트: 2026-04-20 — Story 1-8 완료*
+*최종 업데이트: 2026-04-19 — Story 1-10 완료*
