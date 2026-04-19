@@ -2,10 +2,12 @@
 //
 // MossSaveLoadSubsystem.cpp — Save/Load Persistence 메인 서브시스템 구현
 //
-// Story 1-8: UMossSaveLoadSubsystem 뼈대 + 4-trigger lifecycle (T1/T2/T3/T4) + coalesce 정책
-// Story 1-9: LoadInitial / ReadSlot / ComputeNextWSN / GetSlotPath 구현
+// Story 1-8:  UMossSaveLoadSubsystem 뼈대 + 4-trigger lifecycle (T1/T2/T3/T4) + coalesce 정책
+// Story 1-9:  LoadInitial / ReadSlot / ComputeNextWSN / GetSlotPath 구현
+// Story 1-16: RunMigrationChain / IsSemanticallySane / MigrateFromV1ToV2 구현
+//             Formula 4 (Steps = CURRENT − From) + deep-copy rollback + sanity check
 // ADR-0009: per-trigger atomicity (sequence-level API 금지 — GSM 책임)
-// GDD: design/gdd/save-load-persistence.md §Core Rules 5 + §States + §Formula 1-3
+// GDD: design/gdd/save-load-persistence.md §Core Rules 5 + §States + §Formula 1-4
 //
 // 구현 범위:
 //   - Initialize: SaveData NewObject, delegate 등록, LoadInitial() 호출
@@ -18,14 +20,14 @@
 //   - ReadSlot: Formula 3 6-condition short-circuit 유효성 검증
 //   - ComputeNextWSN: Formula 2 max+1 + wrap detection
 //   - GetSlotPath: 플랫폼 경로 생성
+//   - RunMigrationChain: Formula 4 순차 migrator + deep-copy rollback + sanity check
+//   - IsSemanticallySane: DayIndex ∈ [1,21] + NarrativeCount >= 0 불변식
+//   - MigrateFromV1ToV2: dormant no-op (CURRENT_SCHEMA_VERSION=1인 동안)
 //
 // Deferred (Story 1-10):
 //   - 실제 worker thread TFuture 위임
 //   - TFuture::WaitFor timeout (AC E23)
 //   - Atomic write + dual-slot write (CRC 생성 포함)
-//
-// Deferred (Story 1-16):
-//   - Migration chain (Formula 4)
 //
 // Deferred (Story 1-20 또는 게임 코드):
 //   - T1 UGameViewportClient::CloseRequested UWorld* 실제 바인딩
@@ -392,3 +394,160 @@ bool UMossSaveLoadSubsystem::WriteSlotAtomic(TCHAR TargetSlot, const FMossSaveSn
 
     return true;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Story 1-16 — Migration chain (Formula 4) + Sanity check + Rollback
+//
+// UE 5.6 no-exceptions idiom:
+//   - try/catch 미사용 (UE는 C++ exceptions 기본 비활성)
+//   - 각 migrator: bool 반환 + FString& OutError
+//   - 롤백: DuplicateObject deep-copy 백업 + 필드별 명시적 복사
+//     (UObject assignment operator 사용 시 copy semantic 주의 — 명시적 필드 복사가 안전)
+// ─────────────────────────────────────────────────────────────────────────────
+
+bool UMossSaveLoadSubsystem::RunMigrationChain(UMossSaveData* InOut)
+{
+    check(InOut);
+
+    const uint8 From = InOut->SaveSchemaVersion;
+    const uint8 To   = UMossSaveData::CURRENT_SCHEMA_VERSION;
+
+    // Formula 4: Steps = To - From. From == To → no-op.
+    if (From == To)
+    {
+        return true;
+    }
+
+    const auto* Settings = UMossSaveLoadSettings::Get();
+    const uint8 MinCompat = Settings ? Settings->MinCompatibleSchemaVersion : 1;
+
+    // 범위 검증: From > To 는 미래 버전 세이브 (거부), From < MinCompat 는 너무 오래된 세이브 (거부).
+    if (From > To || From < MinCompat)
+    {
+        UE_LOG(LogMossSaveLoad, Warning,
+            TEXT("RunMigrationChain: 범위 초과 거부 — From=%u To=%u MinCompat=%u"),
+            (uint32)From, (uint32)To, (uint32)MinCompat);
+        return false;
+    }
+
+    // Deep-copy 백업 생성 (rollback 원본).
+    // DuplicateObject<T>는 UObject 전체 상태를 복사하는 UE 표준 API.
+    UMossSaveData* Backup = DuplicateObject<UMossSaveData>(InOut, InOut->GetOuter());
+    if (!Backup)
+    {
+        UE_LOG(LogMossSaveLoad, Error,
+            TEXT("RunMigrationChain: DuplicateObject 실패 — 마이그레이션 중단"));
+        return false;
+    }
+
+    // Formula 4: V = From 부터 To-1까지 순차 migrator 호출.
+    for (uint8 V = From; V < To; ++V)
+    {
+        bool    bMigrateOk = false;
+        FString MigrateError;
+
+        switch (V)
+        {
+            case 1:
+            {
+                // V1 → V2 migrator.
+                // CURRENT_SCHEMA_VERSION = 1인 동안 이 case는 실행되지 않는다
+                // (From == To 조건에서 이미 early return).
+                // CURRENT_SCHEMA_VERSION이 2로 bump될 때 이 경로가 활성화된다.
+#if WITH_AUTOMATION_TESTS
+                if (TestV1ToV2Override)
+                {
+                    bMigrateOk = TestV1ToV2Override(InOut, MigrateError);
+                }
+                else
+                {
+                    bMigrateOk = MigrateFromV1ToV2(InOut, MigrateError);
+                }
+#else
+                bMigrateOk = MigrateFromV1ToV2(InOut, MigrateError);
+#endif
+                break;
+            }
+            default:
+            {
+                MigrateError = FString::Printf(TEXT("V%u 마이그레이터 없음"), (uint32)V);
+                bMigrateOk   = false;
+                break;
+            }
+        }
+
+        if (!bMigrateOk)
+        {
+            UE_LOG(LogMossSaveLoad, Error,
+                TEXT("RunMigrationChain: V%u 마이그레이션 실패: %s — 롤백"),
+                (uint32)V, *MigrateError);
+
+            // 롤백: 필드별 명시적 복사 (assignment operator 대신 — UObject copy semantic 안전성).
+            InOut->SaveSchemaVersion = Backup->SaveSchemaVersion;
+            InOut->WriteSeqNumber    = Backup->WriteSeqNumber;
+            InOut->LastSaveReason    = Backup->LastSaveReason;
+            InOut->SessionRecord     = Backup->SessionRecord;
+            InOut->GrowthState       = Backup->GrowthState;
+            InOut->DreamState        = Backup->DreamState;
+            InOut->bSaveDegraded     = Backup->bSaveDegraded;
+            return false;
+        }
+    }
+
+    // 전체 chain 완료 후 세만틱 유효성 검증 (E7).
+    if (!IsSemanticallySane(*InOut))
+    {
+        UE_LOG(LogMossSaveLoad, Error,
+            TEXT("RunMigrationChain: Sanity check 실패 (마이그레이션 후) — 롤백"));
+
+        // 롤백: 필드별 명시적 복사.
+        InOut->SaveSchemaVersion = Backup->SaveSchemaVersion;
+        InOut->WriteSeqNumber    = Backup->WriteSeqNumber;
+        InOut->LastSaveReason    = Backup->LastSaveReason;
+        InOut->SessionRecord     = Backup->SessionRecord;
+        InOut->GrowthState       = Backup->GrowthState;
+        InOut->DreamState        = Backup->DreamState;
+        InOut->bSaveDegraded     = Backup->bSaveDegraded;
+        return false;
+    }
+
+    // 성공: SaveSchemaVersion을 최신 버전으로 갱신.
+    InOut->SaveSchemaVersion = To;
+    return true;
+}
+
+bool UMossSaveLoadSubsystem::IsSemanticallySane(const UMossSaveData& Data) const
+{
+    // 불변식 1: DayIndex ∈ [1, 21] (GDD §SessionRecord, 21일 플레이스루)
+    if (Data.SessionRecord.DayIndex < 1 || Data.SessionRecord.DayIndex > 21)
+    {
+        return false;
+    }
+
+    // 불변식 2: NarrativeCount >= 0 (음수는 비정상 상태)
+    if (Data.SessionRecord.NarrativeCount < 0)
+    {
+        return false;
+    }
+
+    // 추가 불변식은 Growth/Dream epic 필드 확정 후 append.
+    return true;
+}
+
+bool UMossSaveLoadSubsystem::MigrateFromV1ToV2(UMossSaveData* InOut, FString& OutError)
+{
+    // CURRENT_SCHEMA_VERSION = 1이므로 이 migrator는 dormant 경로.
+    // CURRENT_SCHEMA_VERSION이 2로 bump될 때:
+    //   - V2에서 추가된 필드에 기본값 채움 로직을 이 함수에 구현한다.
+    //   - MossSaveData.h에 V2 필드 추가 + CURRENT_SCHEMA_VERSION = 2 bump.
+    //   - 이 함수의 실경로 테스트 (TD-010) 참조.
+    // 현재: no-op, true 반환.
+    return true;
+}
+
+#if WITH_AUTOMATION_TESTS
+void UMossSaveLoadSubsystem::TestingSetV1ToV2Migrator(TFunction<bool(UMossSaveData*, FString&)> InMigrator)
+{
+    TestV1ToV2Override = InMigrator;
+}
+#endif

@@ -2,10 +2,12 @@
 //
 // MossSaveLoadSubsystem.h — Save/Load Persistence 메인 서브시스템 선언
 //
-// Story 1-8: UMossSaveLoadSubsystem 뼈대 + 4-trigger lifecycle (T1/T2/T3/T4) + coalesce 정책
-// Story 1-9: LoadInitial / ReadSlot / ComputeNextWSN / GetSlotPath API + ActiveSlot 멤버
+// Story 1-8:  UMossSaveLoadSubsystem 뼈대 + 4-trigger lifecycle (T1/T2/T3/T4) + coalesce 정책
+// Story 1-9:  LoadInitial / ReadSlot / ComputeNextWSN / GetSlotPath API + ActiveSlot 멤버
+// Story 1-16: RunMigrationChain / IsSemanticallySane / MigrateFromV1ToV2 private helpers
+//             + test hooks (TestingSetV1ToV2Migrator / TestingRunMigrationChain / TestingIsSane)
 // ADR-0009: per-trigger atomicity + coalesce (sequence-level API 금지 — GSM 책임)
-// GDD: design/gdd/save-load-persistence.md §Core Rules 5 + §States + §Formula 1-3
+// GDD: design/gdd/save-load-persistence.md §Core Rules 5 + §States + §Formula 1-4
 //
 // 5-state 머신 (GDD §States):
 //   Idle → Saving (SaveAsync 정상 진입)
@@ -307,9 +309,80 @@ public:
     {
         return ReadSlot(Path, OutHeader, OutPayload);
     }
+
+    // ── Story 1-16 테스트 훅 ─────────────────────────────────────────────────
+
+    /**
+     * [테스트 전용] RunMigrationChain 직접 호출.
+     * Migration chain 경로 테스트용.
+     * 프로덕션 코드에서 절대 호출 금지.
+     */
+    bool TestingRunMigrationChain(UMossSaveData* InOut) { return RunMigrationChain(InOut); }
+
+    /**
+     * [테스트 전용] IsSemanticallySane 직접 호출.
+     * 세만틱 유효성 검증 경로 테스트용.
+     * 프로덕션 코드에서 절대 호출 금지.
+     */
+    bool TestingIsSane(const UMossSaveData& Data) const { return IsSemanticallySane(Data); }
+
+    /**
+     * [테스트 전용] V1→V2 migrator 함수 오버라이드 설정.
+     *
+     * nullptr 전달 시 오버라이드 해제 → 프로덕션 경로(MigrateFromV1ToV2) 사용.
+     * UE no-exceptions idiom: migrator는 bool 반환 + FString& OutError.
+     * 프로덕션 코드에서 절대 호출 금지.
+     *
+     * @param InMigrator  대체 migrator. nullptr 전달 시 오버라이드 해제.
+     */
+    void TestingSetV1ToV2Migrator(TFunction<bool(UMossSaveData*, FString&)> InMigrator);
+
 #endif
 
 private:
+    // ── Migration Helpers (Story 1-16) ───────────────────────────────────────
+
+    /**
+     * Migration chain 실행 (Formula 4: Steps = CURRENT − From).
+     *
+     * From == To (이미 최신) → 즉시 true 반환 (no-op).
+     * From < MinCompatibleSchemaVersion 또는 From > To → false 반환 (경고 로그).
+     * 각 버전 migrator 실패 시 DuplicateObject deep-copy 백업으로 롤백 → false 반환.
+     * 전체 chain 성공 후 IsSemanticallySane 검증 → 실패 시 롤백 → false 반환.
+     *
+     * UE no-exceptions idiom: try/catch 미사용.
+     * 롤백: DuplicateObject 백업에서 필드별 명시적 복사 (assignment operator 대신).
+     *
+     * @param InOut  마이그레이션 대상 + 결과 저장 포인터 (non-null, check()로 강제)
+     * @return       chain 전체 성공 + sanity check 통과 시 true
+     */
+    bool RunMigrationChain(UMossSaveData* InOut);
+
+    /**
+     * 마이그레이션 후 세만틱 유효성 검증.
+     *
+     * 검증 불변식:
+     *   - DayIndex ∈ [1, 21]
+     *   - NarrativeCount >= 0
+     *
+     * @param Data  검증 대상 세이브 데이터 (const ref)
+     * @return      모든 불변식 통과 시 true
+     */
+    bool IsSemanticallySane(const UMossSaveData& Data) const;
+
+    /**
+     * V1 → V2 migrator (dormant — CURRENT_SCHEMA_VERSION = 1인 동안 미실행).
+     *
+     * CURRENT_SCHEMA_VERSION이 2로 bump될 때 이 함수에 V2 필드 기본값 채움 로직 추가.
+     * 현재: no-op, true 반환.
+     * UE no-exceptions idiom: bool 반환 + FString& OutError.
+     *
+     * @param InOut     마이그레이션 대상 포인터
+     * @param OutError  실패 시 오류 메시지 (성공 시 미수정)
+     * @return          성공 시 true
+     */
+    bool MigrateFromV1ToV2(UMossSaveData* InOut, FString& OutError);
+
     // ── Load Helpers (Story 1-9) ──────────────────────────────────────────────
 
     /**
@@ -432,6 +505,18 @@ private:
      * 테스트 가시성: TestingGetIOCommitCount() / TestingResetIOCommitCount().
      */
     int32 IOCommitCount = 0;
+
+    // ── Story 1-16 테스트 전용 멤버 ─────────────────────────────────────────────
+
+#if WITH_AUTOMATION_TESTS
+    /**
+     * [테스트 전용] V1→V2 migrator 오버라이드 함수.
+     * 기본값 빈 TFunction(false-y) → 프로덕션 경로(MigrateFromV1ToV2) 사용.
+     * TestingSetV1ToV2Migrator()로 설정. RunMigrationChain 내부에서 참조.
+     * UE no-exceptions idiom: bool 반환 + FString& OutError.
+     */
+    TFunction<bool(UMossSaveData*, FString&)> TestV1ToV2Override;
+#endif
 
     // ── Delegate Handles (dangling 방지) ─────────────────────────────────────
 

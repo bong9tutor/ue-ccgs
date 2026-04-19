@@ -182,12 +182,12 @@ stories:
     name: "Save/Load 005 — Migration chain + archive fallback"
     file: "production/epics/foundation-save-load/story-005-migration-chain-archive.md"
     priority: should-have
-    status: backlog
-    owner: ""
+    status: done
+    owner: "unreal-specialist"
     estimate_days: 0.5
     depends_on: ["1-10"]
     blocker: ""
-    completed: ""
+    completed: "2026-04-19"
 
   - id: "1-17"
     name: "Input 004 — Offer Hold Formula 2 (Mouse 0.15s / Gamepad 0.20s)"

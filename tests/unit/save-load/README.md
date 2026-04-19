@@ -184,13 +184,75 @@ UnrealEditor-Cmd.exe MadeByClaudeCode.uproject \
 
 ---
 
+---
+
+## Story 1-16 — Migration chain + Sanity check + Rollback
+
+- 실제 cpp: `MadeByClaudeCode/Source/MadeByClaudeCode/Tests/MossSaveMigrationTests.cpp`
+- 카테고리: `MossBaby.SaveLoad.Migration.*`
+
+### 테스트 함수 목록
+
+| 함수명 | 카테고리 | AC |
+|--------|----------|----|
+| `FMossMigrationNoOpWhenSameVersionTest` | `MossBaby.SaveLoad.Migration.NoOpWhenSameVersion` | Formula 4 no-op (From == To) |
+| `FMossMigrationSanityCheckRejectsInvalidDayIndexTest` | `MossBaby.SaveLoad.Migration.SanityCheck.RejectsZeroDayIndex` | MIGRATION_SANITY_CHECK_POST 하한 |
+| `FMossMigrationSanityCheckRejectsUpperBoundDayIndexTest` | `MossBaby.SaveLoad.Migration.SanityCheck.RejectsUpperBoundDayIndex` | MIGRATION_SANITY_CHECK_POST 상한 |
+| `FMossMigrationSanityCheckAcceptsValidRangeTest` | `MossBaby.SaveLoad.Migration.SanityCheck.AcceptsValidDayRange` | MIGRATION_SANITY_CHECK_POST 유효 범위 |
+| `FMossMigrationSanityCheckRejectsNegativeNarrativeTest` | `MossBaby.SaveLoad.Migration.SanityCheck.RejectsNegativeNarrativeCount` | MIGRATION_SANITY_CHECK_POST NarrativeCount 음수 |
+| `FMossMigrationRollbackStubTest` | `MossBaby.SaveLoad.Migration.RollbackStub.CurrentV1NoopConfirm` | MIGRATION_EXCEPTION_ROLLBACK (stub) |
+
+### AC 매핑
+
+| AC | 설명 | 검증 방식 | 테스트 함수 |
+|----|------|-----------|-------------|
+| MIGRATION_SANITY_CHECK_POST | IsSemanticallySane: DayIndex=0/22 → false, DayIndex ∈ [1,21] NarrativeCount≥0 → true | AUTOMATED | 테스트 2·3·4·5 |
+| MIGRATION_EXCEPTION_ROLLBACK | CURRENT_SCHEMA_VERSION=1 constexpr 고정이라 실경로 없음. no-op 재확인 + TD-010 placeholder | AUTOMATED (stub) | `FMossMigrationRollbackStubTest` |
+| Formula 4 Steps | From==To no-op. loop 실행 경로는 CURRENT_SCHEMA_VERSION bump 시 활성화 | AUTOMATED (no-op) | `FMossMigrationNoOpWhenSameVersionTest` |
+| ENGINE_ARCHIVE_VERSION_MISMATCH | LoadGameFromMemory null check → fallback (Story 1-9 경로에서 자연 처리) | MANUAL | release-gate evidence |
+| ENGINE_ARCHIVE_5_6_TO_5_6_1_ROUND_TRIP | 3 outcome 중 하나만 (정상/fallback/FreshStart) | MANUAL | release-gate evidence |
+
+### UE 5.6 C++ no-exceptions 구현 패턴
+
+- `try/catch` 미사용 — UE 5.6은 C++ exceptions 기본 비활성
+- migrator 시그니처: `bool MigrateFromV<N>ToV<N+1>(UMossSaveData* InOut, FString& OutError)`
+- 실패 표현: bool return false + OutError 메시지 채움
+- Deep-copy rollback: `DuplicateObject<UMossSaveData>(InOut, InOut->GetOuter())`
+- 필드별 명시적 복사 (`*InOut = *Backup` 대신 — UObject assignment operator 안전성)
+- Test hook: `TestingSetV1ToV2Migrator(TFunction<bool(UMossSaveData*, FString&)>)`
+
+### Deferred / Tech-debt
+
+| 항목 | 이유 | 식별자 |
+|------|------|--------|
+| V1→V2 실경로 rollback 테스트 | CURRENT_SCHEMA_VERSION=1 constexpr 고정 → loop 미실행 | TD-010 |
+| ENGINE_ARCHIVE_* MANUAL 증거 | 실기 드라이버 의존, CI 환경 불가 | release-gate evidence |
+| Story 1-20 Narrative atomic | 범위 외 (별도 Story) | — |
+
+### 실행 명령 (headless)
+
+```bash
+UnrealEditor-Cmd.exe MadeByClaudeCode.uproject \
+  -ExecCmds="Automation RunTests MossBaby.SaveLoad.Migration.; Quit" \
+  -nullrhi -nosound -log -unattended
+```
+
+전체 SaveLoad epic 테스트:
+
+```bash
+UnrealEditor-Cmd.exe MadeByClaudeCode.uproject \
+  -ExecCmds="Automation RunTests MossBaby.SaveLoad.; Quit" \
+  -nullrhi -nosound -log -unattended
+```
+
+---
+
 ## 미구현 스토리 (Out of Scope)
 
 | Story | 내용 | 상태 |
 |-------|------|------|
-| Story 1-16 | Migration chain (Formula 4) | 미시작 |
 | Story 1-20 | Async TFuture worker thread 위임 + T1 viewport 실제 바인딩 | 미시작 |
 
 ---
 
-*최종 업데이트: 2026-04-19 — Story 1-10 완료*
+*최종 업데이트: 2026-04-19 — Story 1-16 완료*

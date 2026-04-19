@@ -1,9 +1,10 @@
 # Story 005: Migration chain (Formula 4) + Sanity check + Exception rollback + Engine archive fallback
 
 > **Epic**: Save/Load Persistence
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
+> **Estimate**: 0.5 days (~3-4 hours)
 > **Manifest Version**: 2026-04-19
 
 ## Context
@@ -146,3 +147,40 @@ bool UMossSaveLoadSubsystem::MigrateFromV1ToV2(UMossSaveData* InOut) {
 
 - Depends on: Story 003 (Header + Validity), Story 004 (Atomic write)
 - Unlocks: Story 006
+
+---
+
+## Completion Notes
+
+**Completed**: 2026-04-19
+**Criteria**: 3/5 AUTOMATED (dormant paths로 인해 future-bump 전까지 실경로 부재) + 2 MANUAL (release-gate)
+**Files delivered**:
+- `SaveLoad/MossSaveLoadSubsystem.h/.cpp` (수정) — RunMigrationChain/IsSemanticallySane/MigrateFromV1ToV2 + Testing 훅 (Mock migrator injection)
+- `Tests/MossSaveMigrationTests.cpp` (신규)
+- `tests/unit/save-load/README.md` Story 1-16 섹션 append
+
+**Test Evidence**: UE Automation — `MossBaby.SaveLoad.Migration.*`
+
+**AC 커버**:
+- [x] MIGRATION_SANITY_CHECK_POST: IsSemanticallySane 직접 검증 (DayIndex=0, 25, NarrativeCount=-1 negative case)
+- [~] MIGRATION_EXCEPTION_ROLLBACK: CURRENT_SCHEMA_VERSION=1 constexpr이라 실경로 없음. Mock migrator injection 훅 준비 완료. TD-010 등록 예정.
+- [x] Formula 4 Steps: NoOp path (From==To) 검증. Future V2 bump 시 multi-step 검증 가능.
+- [ ] ENGINE_ARCHIVE_VERSION_MISMATCH (MANUAL): release-gate evidence (별도 5.6 ↔ 5.6.1 빌드 필요)
+- [ ] ENGINE_ARCHIVE_5_6_TO_5_6_1_ROUND_TRIP (MANUAL): release-gate evidence
+
+**ADR/Rule 준수**:
+- ADR-0001 grep: 0 매치
+- UE no-exceptions idiom: `bool` 반환 + `FString& OutError` (try/catch 사용 없음)
+- Deep-copy rollback: `DuplicateObject<UMossSaveData>` + 필드별 명시적 복사
+- Sanity invariants: DayIndex ∈ [1, 21], NarrativeCount ≥ 0
+- Build.cs 수정 없음
+
+**Implementation 주의**:
+- CURRENT_SCHEMA_VERSION = 1 (static constexpr) — V1→V2 migrator dormant (no-op return true)
+- `TestingSetV1ToV2Migrator` 훅으로 mock migrator 주입 가능 (현재 CURRENT=1이라 loop 미실행 한계)
+- 필드별 rollback: USaveGame assignment operator 부작용 방지 (UObject 복사 semantics)
+
+**Deferred**:
+- Formula 4 multi-step 실경로: CURRENT_SCHEMA_VERSION 2+ bump 시 재검증 (TD-010)
+- ENGINE_ARCHIVE MANUAL: 5.6 ↔ 5.6.1 dual 빌드 release-gate evidence
+- Compound event 및 E14/E15 (Story 1-20)
