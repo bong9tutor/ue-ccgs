@@ -1,9 +1,10 @@
 # Story 002: UMossSaveLoadSubsystem 뼈대 + 4-trigger lifecycle (T1/T2/T3/T4) + coalesce 정책
 
 > **Epic**: Save/Load Persistence
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
+> **Estimate**: 0.7 days (~5 hours)
 > **Manifest Version**: 2026-04-19
 
 ## Context
@@ -202,3 +203,34 @@ void UMossSaveLoadSubsystem::Deinitialize() {
 
 - Depends on: Story 001 (UMossSaveData + Settings)
 - Unlocks: Story 003, 004, 005
+
+---
+
+## Completion Notes
+
+**Completed**: 2026-04-19
+**Criteria**: 10/13 passing, 2 partial, 1 AC 스펙 범위 밖 (AC E19/E20/E22 뼈대 레벨 coalesce 증명)
+
+**Files delivered**:
+- `SaveLoad/MossSaveLoadSubsystem.h` (320 lines, 뼈대 선언 + Testing 훅)
+- `SaveLoad/MossSaveLoadSubsystem.cpp` (300 lines, 4-trigger + coalesce)
+- `Tests/MossSaveLoadSubsystemTests.cpp` (450 lines, 7 tests)
+- `tests/unit/save-load/README.md` (Story 1-8 섹션 append)
+
+**Test Evidence**: 7 UE Automation — `MossBaby.SaveLoad.Subsystem.*` (InitialState/SaveAsyncIdleToSaving/LoadingStateDrop/MigratingCoalesce/HundredXCoalesce/PendingConsumeOnIdle/DeinitFlushReentry)
+
+**ADR 준수**:
+- ADR-0001 grep: 0 매치
+- ADR-0009: per-trigger atomicity (sequence-level BeginTransaction/Commit API 없음)
+- Delegate dangling 방지: FDelegateHandle 정확한 Remove
+- FThreadSafeBool 재진입 차단 (T3 비-게임 스레드 대비)
+- FSlateApplication::IsInitialized() 가드 (nullrhi/headless)
+
+**Deferred (Story 1-10)**:
+- AC E22 실제 I/O ≤ 2 (TFuture 구현 이후 증명 가능)
+- AC E23 DeinitFlushTimeoutSec TFuture WaitFor 타임아웃
+
+**Deferred (Story 1-20 또는 게임 코드)**:
+- T1 GameViewport `CloseRequested(UWorld*)` 실제 바인딩
+
+**Integration test**: TD-005 lifecycle story에 포함 (UGameInstance 실제 초기화 경로)
