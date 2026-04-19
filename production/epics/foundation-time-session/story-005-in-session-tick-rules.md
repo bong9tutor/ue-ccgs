@@ -1,9 +1,10 @@
 # Story 005: In-session 1Hz Tick + Rules 5-8 + Formulas 2, 3 + FTSTicker
 
 > **Epic**: Time & Session System
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
+> **Estimate**: 0.5 days (~3-4 hours)
 > **Manifest Version**: 2026-04-19
 
 ## Context
@@ -178,3 +179,41 @@ void UMossTimeSessionSubsystem::AdvanceDayIfNeeded(double WallDeltaSec) {
 
 - Depends on: Story 003 (Subsystem 뼈대), Story 004 (Between-session 부분 구현)
 - Unlocks: Story 006
+
+---
+
+## Completion Notes
+
+**Completed**: 2026-04-19
+**Criteria**: 7/9 AUTOMATED + 2 deferred integration (TICK_CONTINUES_WHEN_PAUSED, FOCUS_LOSS_CONTINUES_TICK)
+
+**Files delivered**:
+- `Time/MossTimeSessionSubsystem.h/.cpp` (수정) — FTSTicker 1Hz 등록/해제 + TickInSession + AdvanceDayIfNeeded + Testing 훅
+- `Tests/TimeSessionTickRulesTests.cpp` (신규, ~8 tests)
+- `tests/unit/time-session/README.md` Story 1-18 섹션 append
+
+**Test Evidence**: 8 UE Automation — `MossBaby.Time.Tick.*`
+
+**AC 커버**:
+- [x] MONOTONIC_DELTA_CLAMP_ZERO (Formula 2 max(0, delta))
+- [x] NORMAL_TICK_IN_SESSION (Rule 5, |Δ| ≤ DefaultEpsilonSec)
+- [x] MINOR_SHIFT_NTP (Rule 7, 15s)
+- [x] MINOR_SHIFT_DST (Rule 7, 3600s)
+- [x] IN_SESSION_DISCREPANCY_LOG_ONLY (Rule 8, >90min)
+- [x] RULE_PRECEDENCE_FIRST_MATCH_WINS (Rule 6 over Rule 8)
+- [x] SESSION_COUNT_TODAY_RESET_CONTRACT (DayIndex 전진 시 0 리셋)
+- [~] TICK_CONTINUES_WHEN_PAUSED: TD-012 (실제 GameWorld + SetGamePaused 필요)
+- [~] FOCUS_LOSS_CONTINUES_TICK: TD-012
+
+**ADR-0001 준수**:
+- 금지 패턴 신규 코드 0 매치
+- WallDelta > expected_max 의심 분기 없음
+- Rule 5-8 동일 정책 (forward tamper 탐지 로직 부재)
+
+**Engine Idiom**:
+- FTSTicker::GetCoreTicker().AddTicker (engine-level, pause/focus 무관)
+- FTimerManager 0건 사용
+- Formula 2 FMath::Max(0.0, MonoNow - Last) strict clamp
+
+**Deferred (TD-012)**:
+- TICK_CONTINUES_WHEN_PAUSED / FOCUS_LOSS_CONTINUES_TICK — 실제 GameWorld + SetGamePaused(true) 시나리오 integration test

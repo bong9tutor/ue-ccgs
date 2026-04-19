@@ -206,12 +206,12 @@ stories:
     name: "Time 005 — In-session 1Hz Tick Rules 5-8 + FTSTicker"
     file: "production/epics/foundation-time-session/story-005-in-session-tick-rules.md"
     priority: nice-to-have
-    status: backlog
-    owner: ""
+    status: done
+    owner: "unreal-specialist"
     estimate_days: 0.5
     depends_on: ["1-14"]
     blocker: ""
-    completed: ""
+    completed: "2026-04-19"
 
   - id: "1-19"
     name: "Pipeline 006 — T_init budget 실측 + 3단계 임계 (AC-DP-09/10 [5.6-VERIFY])"
