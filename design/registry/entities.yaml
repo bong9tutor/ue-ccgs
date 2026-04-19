@@ -37,7 +37,7 @@
 #   Each entry: name, status, source, referenced_by[], attributes{}, added, revised
 
 version: 1
-last_updated: ""
+last_updated: 2026-04-19  # /review-all-gdds cleanup: FDreamState + FOnDreamTriggered 추가, UDreamDataAsset fields 확장 + split ownership 명시, FOnFarewellReached 주석 정리 (N-G1/N-G2/N-G3)
 
 # ─── ENTITIES ────────────────────────────────────────────────────────────────
 # Named game-world objects: enemies, NPCs, characters, factions, bosses.
@@ -106,7 +106,73 @@ items: []
 #   output_range[min, max], added
 # Optional: expression (the actual formula), notes
 
-formulas: []
+formulas:
+  - name: Pipeline.MemoryFootprintBytes
+    status: active
+    source: design/gdd/data-pipeline.md
+    referenced_by:
+      - design/gdd/data-pipeline.md
+    variables:
+      - N_card
+      - S_card
+      - N_dream
+      - S_dream
+      - N_form
+      - S_form
+      - N_path
+      - S_path
+    output_range: [0, "unbounded (CPU-side catalog only, texture pool excluded)"]
+    expression: "M = (N_card * S_card) + (N_dream * S_dream) + (N_form * S_form) + (N_path * S_path)"
+    notes: |
+      Data Pipeline Section D1. CPU-side 카탈로그 메모리만. 텍스처 실체는 streaming pool 별도.
+      MVP ≈ 12KB, Full ≈ 120KB — 1.5GB ceiling 대비 무시 가능. 실질 압박은 Lumen + 텍스처 streaming.
+      OQ-D-1: 텍스처 pool 크기는 Lumen Dusk Scene GDD #11에서 확정.
+    added: 2026-04-17
+    revised: ""
+
+  - name: Pipeline.InitializationTimeBudgetMs
+    status: active
+    source: design/gdd/data-pipeline.md
+    referenced_by:
+      - design/gdd/data-pipeline.md
+    variables:
+      - T_base
+      - N_card
+      - C_row
+      - N_dream
+      - N_form
+      - C_asset
+    output_range: [0, "unbounded; budget = MaxInitTimeBudgetMs (50ms)"]
+    expression: "T_init = T_base + (N_card * C_row) + (N_dream * C_asset) + (N_form * C_asset)"
+    notes: |
+      Data Pipeline Section D2. Initialize() 시작 → Ready 도달.
+      MVP ≈ 2.7ms, Full ≈ 8.2ms — MaxInitTimeBudgetMs(50ms) 이내.
+      초과 시 R1 동기 일괄 로드 깨짐 → Async Bundle 전환 + R3 동기 조회 contract 재협상 필요.
+    added: 2026-04-17
+    revised: ""
+
+  - name: Pipeline.MaxCatalogSize
+    status: active
+    source: design/gdd/data-pipeline.md
+    referenced_by:
+      - design/gdd/data-pipeline.md
+    variables:
+      - M_budget_cat
+      - S_cat
+      - T_budget
+      - T_base
+      - C_cat
+    output_range: [0, "unbounded; per-category caps in MaxCatalogSizeCards/Dreams/Forms"]
+    expression: |
+      N_max_cat = floor(M_budget_cat / S_cat)
+      T_max_cat = floor((T_budget - T_base) / C_cat)
+      MaxCatalogSize = min(N_max_cat, T_max_cat)
+    notes: |
+      Data Pipeline Section D3. 카테고리별 상한 도출 공식.
+      카드=200, 꿈=150, 형태=30 (Full Vision의 3-5× 헤드룸).
+      상한 근접 시 fail-close 응답 시간이 늘어나 첫 프레임 지연 체감 단계로 진입.
+    added: 2026-04-17
+    revised: ""
 
 # Example:
 #
@@ -139,30 +205,960 @@ formulas: []
 #
 # Required fields: name, status, source, referenced_by, value, unit, added
 
-constants: []
+constants:
+  - name: GameDurationDays
+    status: active
+    source: design/gdd/time-session-system.md
+    referenced_by:
+      - design/gdd/time-session-system.md
+      - design/gdd/game-state-machine.md
+      - design/gdd/growth-accumulation-engine.md  # added 2026-04-18 consistency-check
+      - design/gdd/card-system.md  # added 2026-04-18 — F-CS-1 SegmentLength
+    value: 21
+    unit: days
+    notes: MVP은 축약 7일 아크로 오버라이드. Tuning Knob §7.
+    added: 2026-04-16
+    revised: ""
 
-# Example:
-#
-# constants:
-#   - name: gold_carry_limit
-#     status: active
-#     source: design/gdd/economy.md
-#     referenced_by:
-#       - design/gdd/economy.md
-#       - design/gdd/inventory.md   # inventory enforces the carry limit
-#       - design/gdd/ui.md          # HUD displays current gold vs limit
-#     value: 9999
-#     unit: gold
-#     added: 2026-03-26
-#     revised: ""
-#
-#   - name: base_inventory_slots
-#     status: active
-#     source: design/gdd/inventory.md
-#     referenced_by:
-#       - design/gdd/inventory.md
-#       - design/gdd/progression.md  # progression unlocks additional slots
-#     value: 20
-#     unit: slots
-#     added: 2026-03-26
-#     revised: ""
+  - name: DefaultEpsilonSec
+    status: active
+    source: design/gdd/time-session-system.md
+    referenced_by:
+      - design/gdd/time-session-system.md
+    value: 5
+    unit: seconds
+    notes: NORMAL_TICK 허용 오차. 반드시 InSessionToleranceMinutes보다 작아야 함.
+    added: 2026-04-16
+    revised: ""
+
+  - name: InSessionToleranceMinutes
+    status: active
+    source: design/gdd/time-session-system.md
+    referenced_by:
+      - design/gdd/time-session-system.md
+    value: 90
+    unit: minutes
+    notes: NTP·DST 흡수 한계. MINOR_SHIFT ≤ 이 값 ≤ IN_SESSION_DISCREPANCY.
+    added: 2026-04-16
+    revised: ""
+
+  - name: NarrativeThresholdHours
+    status: active
+    source: design/gdd/time-session-system.md
+    referenced_by:
+      - design/gdd/time-session-system.md
+    value: 24
+    unit: hours
+    notes: ADVANCE_WITH_NARRATIVE 분기 임계. MVP는 8h 권장. 엄격 `>` 비교.
+    added: 2026-04-16
+    revised: ""
+
+  - name: SuspendMonotonicThresholdSec
+    status: active
+    source: design/gdd/time-session-system.md
+    referenced_by:
+      - design/gdd/time-session-system.md
+    value: 5
+    unit: seconds
+    notes: SUSPEND_RESUME 판정 — monotonic이 이 값 미만이면 정지로 간주.
+    added: 2026-04-16
+    revised: ""
+
+  - name: SuspendWallThresholdSec
+    status: active
+    source: design/gdd/time-session-system.md
+    referenced_by:
+      - design/gdd/time-session-system.md
+    value: 60
+    unit: seconds
+    notes: SUSPEND_RESUME 판정 — wall이 이 값 초과면 suspend로 분류.
+    added: 2026-04-16
+    revised: ""
+
+  - name: NarrativeCapPerPlaythrough
+    status: active
+    source: design/gdd/time-session-system.md
+    referenced_by:
+      - design/gdd/time-session-system.md
+      - design/gdd/save-load-persistence.md
+    value: 3
+    unit: count
+    notes: |
+      ADVANCE_WITH_NARRATIVE per-playthrough 상한 (Pillar 3 강제).
+      MVP 7일은 1로 자동 축소 권장. cap=0은 영구 침묵 옵션.
+      FSessionRecord.NarrativeCount와 짝.
+      Save/Load §AC NARRATIVE_COUNT_ATOMIC_COMMIT + §E24가 cap-leak 방지 contract 검증.
+    added: 2026-04-16
+    revised: 2026-04-16
+
+  - name: SaveSchemaVersion
+    status: active
+    source: design/gdd/save-load-persistence.md
+    referenced_by:
+      - design/gdd/save-load-persistence.md
+      - design/gdd/time-session-system.md
+      - design/gdd/data-pipeline.md
+    value: 1
+    unit: uint8 (build-time const)
+    notes: |
+      Save 파일 헤더의 첫 schema 버전 식별자. 어떤 필드 추가·삭제·재타입·의미 변경 시마다 +1.
+      Save/Load Persistence가 정의·소유. Time GDD §E11이 "Save/Load 마이그레이션 책임"으로 참조.
+      현재 V=1 (MVP). 미래 버전 발견 시 → Invalid (downgrade rejection, Save §Formula 3).
+    added: 2026-04-16
+    revised: ""
+
+  - name: MinCompatibleSchemaVersion
+    status: active
+    source: design/gdd/save-load-persistence.md
+    referenced_by:
+      - design/gdd/save-load-persistence.md
+    value: 1
+    unit: uint8
+    notes: |
+      이 빌드의 마이그레이션 chain이 지원하는 최저 SaveSchemaVersion.
+      Save/Load §Tuning Knobs로 노출. MinCompat ≤ CURRENT 항상 보장.
+      MinCompat = CURRENT면 chain 비어있음 (정상 — MVP 시점).
+      bump 정책은 Save/Load OQ-2.
+    added: 2026-04-16
+    revised: ""
+
+  - name: MaxInitTimeBudgetMs
+    status: active
+    source: design/gdd/data-pipeline.md
+    referenced_by:
+      - design/gdd/data-pipeline.md
+    value: 50
+    unit: milliseconds
+    notes: |
+      Data Pipeline UDataPipelineSubsystem::Initialize() 시작 → Ready 도달까지 허용 budget.
+      약 3프레임(16.6ms × 3). 초과 시 R1 동기 일괄 로드 가정 깨짐 → Async Bundle 전환 필요.
+      Formula D2 InitializationTimeBudgetMs의 권고 상한.
+    added: 2026-04-17
+    revised: ""
+
+  - name: MaxCatalogSizeCards
+    status: active
+    source: design/gdd/data-pipeline.md
+    referenced_by:
+      - design/gdd/data-pipeline.md
+      - design/gdd/card-system.md  # added 2026-04-18 — catalog headroom check
+    value: 200
+    unit: count (DataTable rows)
+    notes: |
+      Card DataTable 행 수 권장 상한. Full Vision 40장의 5× 헤드룸.
+      초과 시 자동 경고 → Async Bundle 검토. Formula D3 MaxCatalogSize 카드 카테고리.
+      Card GDD #8가 자기 콘텐츠 추가 시 이 한도와 대조해야 함.
+    added: 2026-04-17
+    revised: ""
+
+  - name: MaxCatalogSizeDreams
+    status: active
+    source: design/gdd/data-pipeline.md
+    referenced_by:
+      - design/gdd/data-pipeline.md
+    value: 150
+    unit: count (UPrimaryDataAsset instances)
+    notes: |
+      Dream DataAsset 수 권장 상한. Full Vision 50개의 3× 헤드룸.
+      초과 시 자동 경고. Formula D3 MaxCatalogSize 꿈 카테고리.
+      Dream GDD #9가 자기 콘텐츠 추가 시 이 한도와 대조해야 함.
+    added: 2026-04-17
+    revised: ""
+
+  - name: MaxCatalogSizeForms
+    status: active
+    source: design/gdd/data-pipeline.md
+    referenced_by:
+      - design/gdd/data-pipeline.md
+    value: 30
+    unit: count (DataTable rows)
+    notes: |
+      FinalForm DataTable 행 수 권장 상한. Full Vision 8종의 3.75× 헤드룸.
+      초과 시 자동 경고. Formula D3 MaxCatalogSize 형태 카테고리.
+      Growth GDD #7가 자기 콘텐츠 추가 시 이 한도와 대조해야 함.
+    added: 2026-04-17
+    revised: ""
+
+  - name: GrowingDayThreshold
+    status: active
+    source: design/gdd/growth-accumulation-engine.md
+    referenced_by:
+      - design/gdd/growth-accumulation-engine.md
+    value: 6
+    unit: days (DayIndex)
+    notes: |
+      Sprout→Growing 전환 임계일. MVP 오버라이드=3.
+      UGrowthConfigAsset Tuning Knob. MBC DryingFactor가 간접 참조.
+    added: 2026-04-17
+    revised: ""
+
+  - name: MatureDayThreshold
+    status: active
+    source: design/gdd/growth-accumulation-engine.md
+    referenced_by:
+      - design/gdd/growth-accumulation-engine.md
+    value: 15
+    unit: days (DayIndex)
+    notes: |
+      Growing→Mature 전환 임계일. MVP 오버라이드=5.
+      UGrowthConfigAsset Tuning Knob. Growing < Mature < GameDuration 순서 검증 필수.
+    added: 2026-04-17
+    revised: ""
+
+
+# ─── ENUMS ──────────────────────────────────────────────────────────────────
+# Named enumerations with fixed value sets. Register when multiple systems
+# consume or produce these values.
+
+enums:
+  - name: EInputMode
+    status: active
+    source: design/gdd/input-abstraction-layer.md
+    referenced_by:
+      - design/gdd/input-abstraction-layer.md
+    values:
+      - Mouse
+      - Gamepad
+    notes: |
+      마지막 사용 입력 장치. 자동 감지로 전환.
+      OnInputModeChanged delegate 통해 전파.
+      MVP는 Mouse만 사용. Gamepad는 VS부터.
+    added: 2026-04-17
+    revised: ""
+
+  - name: ETimeAction
+    status: active
+    source: design/gdd/time-session-system.md
+    referenced_by:
+      - design/gdd/time-session-system.md
+      - design/gdd/game-state-machine.md
+    values:
+      - START_DAY_ONE
+      - HOLD_LAST_TIME
+      - ADVANCE_SILENT
+      - ADVANCE_WITH_NARRATIVE
+      - LONG_GAP_SILENT
+      - LOG_ONLY
+    notes: |
+      Time → GSM 발행 액션 신호. 분류기 출력.
+      R2: PROMPT_LONG_GAP_CHOICE → LONG_GAP_SILENT (Pillar 1 — 모달 차단·선택 강요 제거).
+    added: 2026-04-16
+    revised: 2026-04-16
+
+  - name: EBetweenSessionClass
+    status: active
+    source: design/gdd/time-session-system.md
+    referenced_by:
+      - design/gdd/time-session-system.md
+    values:
+      - FIRST_RUN
+      - BACKWARD_GAP
+      - ACCEPTED_GAP
+      - LONG_GAP
+    notes: 앱 재시작 시 분류 결과. Rule 1–4 대응.
+    added: 2026-04-16
+    revised: ""
+
+  - name: EInSessionClass
+    status: active
+    source: design/gdd/time-session-system.md
+    referenced_by:
+      - design/gdd/time-session-system.md
+    values:
+      - NORMAL_TICK
+      - SUSPEND_RESUME
+      - MINOR_SHIFT
+      - IN_SESSION_DISCREPANCY
+    notes: 세션 내 1Hz tick 분류. Rule 5–8 대응.
+    added: 2026-04-16
+    revised: ""
+
+  - name: EFarewellReason
+    status: active
+    source: design/gdd/time-session-system.md
+    referenced_by:
+      - design/gdd/time-session-system.md
+    values:
+      - NormalCompletion
+      - LongGapAutoFarewell
+    notes: |
+      Farewell Archive 진입 경로 구분. 감정 톤 차등 결정은 Farewell Archive GDD #17 책임 (이 enum은 분기만 정의).
+      R2: LongGapChoice → LongGapSilent (Pillar 1). R3: LongGapSilent → LongGapAutoFarewell (OQ-4 RESOLVED — 기술 의미만 표현, 톤은 Farewell Archive가 결정).
+    added: 2026-04-16
+    revised: 2026-04-17
+
+  - name: ESaveReason
+    status: active
+    source: design/gdd/save-load-persistence.md
+    referenced_by:
+      - design/gdd/save-load-persistence.md
+      - design/gdd/time-session-system.md
+    values:
+      - ECardOffered      # = 0
+      - EDreamReceived    # = 1
+      - ENarrativeEmitted # = 2
+      - EFarewellReached  # = 3
+    notes: |
+      Save/Load 트리거 사유 분류. 정수 값 stable (한 번 할당 후 변경 금지 — 직렬화 호환성).
+      LastSaveReason: FString 필드는 enum 이름을 문자열로 저장 (예: "ECardOffered") — ordinal 재번호화에 robust.
+      Time GDD §E6 contract 응답: Time이 후보 enum 명시, Save/Load가 정식 정의.
+      미래 버전에서 새 reason 추가는 끝에 다음 정수로 append, 중간 삽입 금지.
+      Time R3에서 Time GDD §E6 cross-ref로 이 entry 참조 명시 권장.
+    added: 2026-04-16
+    revised: ""
+
+  - name: EDataPipelineState
+    status: active
+    source: design/gdd/data-pipeline.md
+    referenced_by:
+      - design/gdd/data-pipeline.md
+    values:
+      - Uninitialized       # Subsystem 생성 직후, 조회 호출 = assert
+      - Loading             # Initialize() 진입, 카탈로그 등록 진행
+      - Ready               # 4개 카탈로그 모두 등록 성공
+      - DegradedFallback    # 한 카탈로그라도 실패; 성공분만 조회 허용; 재시도 없음
+    notes: |
+      UDataPipelineSubsystem의 4-state 상태 머신. Section C "States and Transitions" 표 참조.
+      Ready/DegradedFallback는 앱 종료까지 유지 (자동 재시도 없음 — 에디터 설정 오류 가정).
+      downstream 조회가 nullptr/{} 받았을 때 fail-close로 day 동작 건너뛰기 (R3).
+    added: 2026-04-17
+    revised: ""
+
+  - name: EStillnessChannel
+    status: active
+    source: design/gdd/stillness-budget.md
+    referenced_by:
+      - design/gdd/stillness-budget.md
+      - design/gdd/game-state-machine.md
+    values:
+      - Motion              # 애니메이션, UI 트랜지션, wobble
+      - Particle            # Niagara 이펙트 (포자, 이슬, 빛 먼지)
+      - Sound               # 이벤트성 사운드 큐 (BGM 제외)
+    notes: |
+      Stillness Budget 슬롯 요청 시 채널 지정. 채널 간 슬롯 공유 없음.
+      각 채널의 슬롯 상한은 UStillnessBudgetAsset 필드로 정의.
+    added: 2026-04-17
+    revised: ""
+
+  - name: EGrowthStage
+    status: active
+    source: design/gdd/moss-baby-character-system.md
+    referenced_by:
+      - design/gdd/moss-baby-character-system.md
+      - design/gdd/growth-accumulation-engine.md
+    values:
+      - Sprout             # Day 1-5
+      - Growing            # Day 6-14
+      - Mature             # Day 15-20
+      - FinalForm          # Day 21
+    notes: |
+      Moss Baby 성장 단계. Growth Accumulation Engine(#7)이 결정, Moss Baby가 시각화.
+      FOnGrowthStageChanged(EGrowthStage) delegate로 전파.
+      Growth GDD 작성 시 source 이전 검토.
+    added: 2026-04-17
+    revised: ""
+
+  - name: ECharacterState
+    status: active
+    source: design/gdd/moss-baby-character-system.md
+    referenced_by:
+      - design/gdd/moss-baby-character-system.md
+    values:
+      - Idle               # 브리딩. 기본 상태
+      - Reacting           # 카드 반응 플래시 (0.3s)
+      - GrowthTransition   # 메시 교체 + 머티리얼 Lerp (1-2s)
+      - Drying             # DryingFactor > 0. 건조·탈색
+      - FinalReveal        # 최종 형태 Lerp (2-3s)
+    notes: |
+      Moss Baby Actor 내부 상태. 우선순위: FinalReveal > GrowthTransition > Reacting > Drying/Idle.
+    added: 2026-04-17
+    revised: ""
+
+  - name: EGameState
+    status: active
+    source: design/gdd/game-state-machine.md
+    referenced_by:
+      - design/gdd/game-state-machine.md
+    values:
+      - Menu              # = 0. 앱 진입 게이트 (콜드 스타트 대기)
+      - Dawn              # = 1. 새로운 날의 의식 (transient)
+      - Offering          # = 2. 카드 선택·건넴 진행 (transient)
+      - Waiting           # = 3. 고요한 관찰 (영속화 대상)
+      - Dream             # = 4. 희소한 꿈 공개 (transient)
+      - Farewell          # = 5. 작별 (종단 상태, 영속화 대상)
+    notes: |
+      GSM 중앙 상태 열거. Waiting과 Farewell만 FSessionRecord.LastPersistedState에 저장.
+      Dream은 로드 시 Waiting으로 강등. Farewell은 종단 (재진입 불가).
+    added: 2026-04-17
+    revised: ""
+
+  - name: EStillnessPriority
+    status: active
+    source: design/gdd/stillness-budget.md
+    referenced_by:
+      - design/gdd/stillness-budget.md
+    values:
+      - Background          # = 0. 환경 루프, 장식 파티클, 앰비언트
+      - Standard            # = 1. 카드 wobble, UI 트랜지션, 건넴 SFX
+      - Narrative           # = 2. 꿈 시퀀스, 성장 변환, 작별 연출
+    notes: |
+      높은 우선순위가 낮은 우선순위 슬롯을 선점(Preempt) 가능.
+      동일 우선순위 간 선점 없음 (FIFO).
+    added: 2026-04-17
+    revised: ""
+
+
+# ─── STRUCTS ────────────────────────────────────────────────────────────────
+# Named data structures that cross system boundaries (typically USTRUCT in UE).
+
+structs:
+  - name: FSessionRecord
+    status: active
+    source: design/gdd/time-session-system.md
+    referenced_by:
+      - design/gdd/time-session-system.md
+      - design/gdd/save-load-persistence.md
+      - design/gdd/game-state-machine.md
+    fields:
+      - name: SessionUuid
+        type: FGuid
+        description: 앱 실행 시 FGuid::NewGuid()로 생성. between-session 감지 키.
+      - name: LastWallUtc
+        type: FDateTime
+        description: UTC 기준 마지막 저장 시각.
+      - name: LastMonotonicSec
+        type: double
+        description: FPlatformTime::Seconds() 값. 반드시 double (float 금지).
+      - name: DayIndex
+        type: int32
+        description: 현재 일차, clamp(1..21).
+      - name: NarrativeCount
+        type: int32
+        description: |
+          ADVANCE_WITH_NARRATIVE 누적 카운터. [0, NarrativeCapPerPlaythrough].
+          R2 추가 (Pillar 3 cap 강제용). 발행 시마다 +1 후 즉시 영속화.
+      - name: LastSaveReason
+        type: FString
+        description: |
+          저장 트리거 이유 (중복 이벤트 감지용).
+          Reason enum 집합은 Save/Load GDD가 ESaveReason으로 정식 정의 (4 values).
+          enum 이름을 문자열로 저장 (예: "ECardOffered") — ordinal 안정성.
+          마지막 쓰기의 atomic durability는 Save/Load의 contract (Save §5).
+      - name: LastPersistedState
+        type: EGameState
+        description: |
+          GSM이 영속화 대상 상태(Waiting, Farewell)에 진입할 때 갱신.
+          로드 시 GSM 초기 상태 결정에 사용. Dream 저장 시 Waiting으로 강등.
+          Game State Machine GDD 추가 필드.
+      - name: bWithered
+        type: bool
+        description: |
+          메마름 서브컨디션. ADVANCE_SILENT/ADVANCE_WITH_NARRATIVE 수신 시
+          DayIndex 점프폭 > WitheredThresholdDays(기본 3)이면 true 설정.
+          FOnCardOffered 수신 시 false 해제. 영속화 대상.
+          Game State Machine GDD R3 추가 필드.
+      - name: PlaythroughSeed
+        type: uint32
+        description: |
+          플레이스루별 고유 RNG 시드. 첫 실행 시 FMath::Rand()로 생성, 이후 불변.
+          Card System CR-CS-1이 HashCombine(PlaythroughSeed, DayIndex)로
+          결정론적 카드 풀을 구성. 앱 재시작 시 동일 핸드 재생성 보장.
+          Card System GDD OQ-CS-7 해소. cross-review C-1 (2026-04-18).
+    notes: |
+      USaveGame 직렬화 대상. 모든 필드에 UPROPERTY() 필수. Save/Load Persistence가 저장·복원 책임.
+      R2: NarrativeCount 필드 추가, LastSaveReason contract 명시.
+      Save/Load GDD 추가: LastSaveReason enum 집합이 ESaveReason으로 정식화.
+      GSM GDD 추가: LastPersistedState 필드 (EGameState enum).
+      GSM R3 추가: bWithered 필드 (bool, 메마름 서브컨디션 영속화).
+    added: 2026-04-16
+    revised: 2026-04-17  # bWithered 추가 (GSM R3 consistency-check)
+
+  - name: UDataPipelineSubsystem
+    status: active
+    source: design/gdd/data-pipeline.md
+    referenced_by:
+      - design/gdd/data-pipeline.md
+    fields:
+      - name: ContentRegistry
+        type: TMap<FName, TWeakObjectPtr<UObject>>
+        description: 등록된 모든 카탈로그의 단일 인덱스. 4개 카탈로그가 R2 순서로 등록.
+      - name: CurrentState
+        type: EDataPipelineState
+        description: 4-state. 상태별 조회 허용 여부는 Section C States 표.
+    notes: |
+      UCLASS (UGameInstanceSubsystem 상속). 이 registry는 USTRUCT-only가 아니므로
+      structs 섹션에 포함하되 UCLASS임을 명시. UGameInstance::Init() 직후 자동 생성.
+      모든 downstream의 조회 진입점. push 없음, 모두 pull. Save/Load와 직접 통신하지 않음.
+    added: 2026-04-17
+    revised: ""
+
+  - name: FGiftCardRow
+    status: active
+    source: design/gdd/data-pipeline.md
+    referenced_by:
+      - design/gdd/data-pipeline.md
+      - design/gdd/card-system.md  # added 2026-04-18 — field meaning ownership
+    fields:
+      - name: CardId
+        type: FName
+        description: Card row primary key. Pipeline.GetCardRow의 lookup key.
+      - name: Tags
+        type: TArray<FName>
+        description: 태그 배열 (계절·원소·감정). 누적 벡터 입력. C1 schema 가드.
+      - name: DisplayName
+        type: FText
+        description: 카드 이름 (한국어, String Table 경유 권장).
+      - name: Description
+        type: FText
+        description: 카드 설명 (시적 텍스트).
+      - name: IconPath
+        type: FSoftObjectPath
+        description: 카드 아이콘 텍스처. 비동기 로드 호출자 책임 (R6).
+    notes: |
+      USTRUCT for UDataTable rows. **C1 schema constraint OWNED by data-pipeline.md** —
+      허용 필드: FName, TArray<FName>, FText, FSoftObjectPath만. int32/float/double 류
+      수치 효과 필드 정의 금지 (Pillar 2 보호). UEditorValidatorBase가 저장 시점 검증.
+      필드 의미·관계 정의는 Card System GDD #8가 owns (작성 시 referenced_by 추가 + 필드 갱신).
+      forward-declared in this GDD (#2).
+    added: 2026-04-17
+    revised: ""
+
+  - name: FFinalFormRow
+    status: active
+    source: design/gdd/growth-accumulation-engine.md
+    referenced_by:
+      - design/gdd/data-pipeline.md
+      - design/gdd/growth-accumulation-engine.md
+    fields:
+      - name: FormId
+        type: FName
+        description: FinalForm primary key. Pipeline.GetGrowthFormRow lookup.
+      - name: RequiredTagWeights
+        type: TMap<FName, float>
+        description: 이 형태의 이상적 태그 분포. F3 Score 내적 대상. 합계 1.0 권고.
+      - name: DisplayName
+        type: FText
+        description: 형태 이름 (String Table 경유).
+      - name: MeshPath
+        type: FSoftObjectPath
+        description: 최종 형태 Static Mesh 경로.
+      - name: MaterialPresetPath
+        type: FSoftObjectPath
+        description: 최종 형태 머티리얼 프리셋 경로.
+    notes: |
+      USTRUCT for UDataTable rows. Data Pipeline(#2)이 카탈로그 등록·로드,
+      Growth Accumulation(#7)이 필드 정의·의미적 소유. source 이전 완료 (2026-04-17).
+      MaxCatalogSizeForms=30 (Data Pipeline 상수).
+    added: 2026-04-17
+    revised: ""
+
+  - name: UDreamDataAsset
+    status: active
+    source: design/gdd/data-pipeline.md
+    semantic_owner: design/gdd/dream-trigger-system.md  # split ownership (2026-04-19)
+    referenced_by:
+      - design/gdd/data-pipeline.md
+      - design/gdd/dream-trigger-system.md  # CR-7 field definitions + CR-1 trigger evaluation
+      - design/gdd/dream-journal-ui.md  # body text consumption
+    fields:
+      - name: DreamId
+        type: FName
+        description: PrimaryAssetId. UAssetManager type-bulk 로드 키.
+      - name: BodyText
+        type: FText
+        description: 꿈 본문 텍스트 (String Table 경유). Dream Journal UI 표시.
+      - name: TriggerTagWeights
+        type: TMap<FName, float>
+        description: F1 TagScore 내적 대상. 트리거 평가 핵심. C2 schema 가드.
+      - name: TriggerThreshold
+        type: float
+        description: TagScore ≥ TriggerThreshold 시 후보 진입. clamp [0.0, 1.0]. EditAnywhere 의무.
+      - name: RequiredStage
+        type: EGrowthStage
+        description: 후보 게이트. Dream Trigger가 현재 stage와 비교.
+      - name: EarliestDay
+        type: int32
+        description: 해당 꿈이 트리거 가능한 최초 DayIndex. 기본 2.
+    notes: |
+      UCLASS (UPrimaryDataAsset 상속). **Split ownership model (2026-04-19 명시)**:
+      - `source: data-pipeline.md` — C2 schema constraint OWNED by Data Pipeline (Pillar 3 보호).
+        트리거 임계는 반드시 UPROPERTY(EditAnywhere)로 노출, 코드 내 리터럴 임계 금지.
+        UEditorValidatorBase가 저장 시점 검증.
+      - `semantic_owner: dream-trigger-system.md` — 필드 의미·트리거 평가 알고리즘 OWNED by Dream Trigger GDD #9.
+        CR-7 필드 정의 + F1 TagScore 공식.
+      두 책임 분리: Data Pipeline = compile-time/editor-save guard, Dream Trigger = runtime semantics.
+      forward-declared in data-pipeline.md (#2).
+    added: 2026-04-17
+    revised: 2026-04-19  # split ownership 명시 + fields 확장 (N-G1/N-G2 해소)
+
+  - name: UStillnessBudgetAsset
+    status: active
+    source: design/gdd/data-pipeline.md
+    referenced_by:
+      - design/gdd/data-pipeline.md
+      - design/gdd/stillness-budget.md
+    fields:
+      - name: AssetId
+        type: FPrimaryAssetId
+        description: 단일 인스턴스. Pipeline.GetStillnessBudgetAsset로 조회.
+    notes: |
+      UCLASS (UPrimaryDataAsset 상속). 단일 인스턴스 자산 (multiple instance 금지).
+      Pipeline은 Initialize 시 1회 pull + 캐싱 (interaction table).
+      필드 정의(동시 애니메이션·파티클·사운드 상한, Reduced Motion 토글)는
+      Stillness Budget GDD #10가 owns. forward-declared in this GDD (#2).
+    added: 2026-04-17
+    revised: ""
+
+  - name: UGameStateMPCAsset
+    status: active
+    source: design/gdd/game-state-machine.md
+    referenced_by:
+      - design/gdd/game-state-machine.md
+    fields:
+      - name: AssetId
+        type: FPrimaryAssetId
+        description: 단일 인스턴스. Data Pipeline 경유 로드.
+    notes: |
+      UCLASS (UPrimaryDataAsset 상속). 상태별 MPC 목표값(ColorTemp, LightAngle,
+      Contrast, Ambient RGB × 6 states) + 전환별 블렌드 D_min/D_max + DawnMinDwellSec
+      + BlendDurationBias + CardSystemReadyTimeoutSec. 코드 내 리터럴 금지.
+      forward-declared in game-state-machine.md.
+    added: 2026-04-17
+    revised: ""
+
+  - name: FStillnessHandle
+    status: active
+    source: design/gdd/stillness-budget.md
+    referenced_by:
+      - design/gdd/stillness-budget.md
+      - design/gdd/game-state-machine.md
+    fields:
+      - name: bValid
+        type: bool
+        description: 핸들 유효성. Release 또는 선점 시 false로 설정.
+      - name: Channel
+        type: EStillnessChannel
+        description: 이 핸들이 점유하는 채널.
+      - name: Priority
+        type: EStillnessPriority
+        description: 이 핸들의 우선순위.
+    notes: |
+      Stillness Budget의 Request() 반환값. Move-only (복사 금지).
+      Release는 idempotent — bValid 확인 후 no-op.
+      선점 시 서버 측에서 즉시 bValid=false 설정 + OnPreempted delegate 발행.
+      소멸자에서 자동 Release (RAII).
+    added: 2026-04-17
+    revised: ""
+
+  - name: FGrowthState
+    status: active
+    source: design/gdd/growth-accumulation-engine.md
+    referenced_by:
+      - design/gdd/growth-accumulation-engine.md
+      - design/gdd/save-load-persistence.md
+    fields:
+      - name: TagVector
+        type: TMap<FName, float>
+        description: 누적 태그 벡터. 키=태그 FName, 값=누적 가중치.
+      - name: CurrentStage
+        type: EGrowthStage
+        description: 현재 성장 단계. 기본 Sprout.
+      - name: LastCardDay
+        type: int32
+        description: 마지막 카드 건넴 일차. 0=미건넴. MBC DryingFactor 입력.
+      - name: TotalCardsOffered
+        type: int32
+        description: 누적 건넨 카드 수.
+      - name: FinalFormId
+        type: FName
+        description: 최종 형태 ID. 비어있으면 미결정.
+    notes: |
+      USTRUCT. UMossSaveData 안에 typed sub-struct로 거주.
+      Growth Engine이 의미적 소유, Save/Load가 직렬화 책임.
+      MBC OQ-4 해소: LastCardDay는 이 struct 소유.
+    added: 2026-04-17
+    revised: ""
+
+  - name: FGrowthProcessResult
+    status: active
+    source: design/gdd/growth-accumulation-engine.md
+    referenced_by:
+      - design/gdd/growth-accumulation-engine.md
+      - design/gdd/game-state-machine.md
+      - design/gdd/dream-trigger-system.md
+      - design/gdd/card-system.md  # Stage 2 forwarding 설명에서 언급
+    fields:
+      - name: CardId
+        type: FName
+        description: 처리된 카드 ID — Card System의 FOnCardOffered.Broadcast payload와 동일.
+      - name: bIsDay21Complete
+        type: bool
+        description: |
+          Day 21 최종 형태 결정 + FOnFinalFormReached 발행 완료 여부.
+          GSM이 Farewell P0 즉시 진입 결정에 사용 (true면 Offering→Waiting 체류 없이 Farewell).
+      - name: FinalFormId
+        type: FName
+        description: bIsDay21Complete=true일 때 Final Form ID. false면 NAME_None.
+    notes: |
+      Stage 2 delegate FOnCardProcessedByGrowth의 payload USTRUCT.
+      POD-like (FName 2개 + bool 1개) — move/copy 자유. 직렬화 대상 아님 (런타임 delegate payload).
+      ADR-0005 (2026-04-19) 도입.
+    added: 2026-04-19
+    revised: ""
+
+  - name: FDreamState
+    status: active
+    source: design/gdd/dream-trigger-system.md
+    referenced_by:
+      - design/gdd/dream-trigger-system.md  # CR-6 — owner
+      - design/gdd/save-load-persistence.md  # UMossSaveData sub-struct 직렬화
+      - design/gdd/dream-journal-ui.md  # UnlockedDreamIds 읽기
+    fields:
+      - name: UnlockedDreamIds
+        type: TArray<FName>
+        description: 이미 본 꿈의 DreamId 배열. 중복 방지 가드. Dream Journal UI가 read-only 소비.
+      - name: LastDreamDay
+        type: int32
+        description: 마지막 꿈 수신 일차. 0=미수신. 냉각 계산 (F2 DaysSinceLastDream) 기준.
+      - name: DreamsUnlockedCount
+        type: int32
+        description: 플레이스루 꿈 총 수신 횟수. MaxDreamsPerPlaythrough cap 검사 기준.
+      - name: PendingDreamId
+        type: FName
+        description: 선택되었으나 아직 표시되지 않은 꿈 ID (GSM Dream 전환 연기 시). 비어있으면 대기 없음. 로드 복구용.
+    notes: |
+      USTRUCT. UMossSaveData 안의 typed sub-struct로 거주.
+      Dream Trigger가 의미적 소유 (CR-6), Save/Load가 직렬화 책임.
+      CR-1 atomic contract: 1-3번 필드 갱신 + SaveAsync(EDreamReceived)는 동일 call stack.
+      ADR-0005 Stage 2 패턴으로 Growth 태그 가산 후에만 CR-1 평가 — 최신 TagVector 보장.
+    added: 2026-04-19  # N-G1 registry 누락 해소
+    revised: ""
+
+  - name: FGrowthMaterialHints
+    status: active
+    source: design/gdd/growth-accumulation-engine.md
+    referenced_by:
+      - design/gdd/growth-accumulation-engine.md
+      - design/gdd/moss-baby-character-system.md
+    fields:
+      - name: HueShiftOffset
+        type: float
+        description: HueShift 추가 오프셋. clamp [-0.1, 0.1] 후 MBC 프리셋에 가산.
+      - name: SSSOffset
+        type: float
+        description: SSS 추가 오프셋. clamp [0.0, 1.0] 후 MBC 프리셋에 가산.
+      - name: DominantCategory
+        type: FName
+        description: 지배적 태그 카테고리.
+      - name: DominanceRatio
+        type: float
+        description: 지배 카테고리 비율 [0.0, 1.0].
+    notes: |
+      USTRUCT. Growth GetMaterialHints() pull API 반환값.
+      MBC가 카드 반응·단계 전환 후 pull하여 프리셋 오프셋 적용.
+      직렬화 대상 아님 (런타임 계산).
+    added: 2026-04-17
+    revised: ""
+
+
+# ─── DELEGATES ──────────────────────────────────────────────────────────────
+# Named event delegates broadcast across system boundaries.
+
+delegates:
+  - name: FOnTimeActionResolved
+    status: active
+    source: design/gdd/time-session-system.md
+    referenced_by:
+      - design/gdd/time-session-system.md
+      - design/gdd/game-state-machine.md
+    signature: "DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnTimeActionResolved, ETimeAction, ResolvedAction)"
+    notes: Blueprint 접근 가능. UPROPERTY(BlueprintAssignable) 노출. GSM이 구독.
+    added: 2026-04-16
+    revised: ""
+
+  - name: IMossClockSource
+    status: active
+    source: design/gdd/time-session-system.md
+    referenced_by:
+      - design/gdd/time-session-system.md
+    signature: |
+      class IMossClockSource {
+        virtual ~IMossClockSource() = default;
+        virtual FDateTime GetUtcNow() const = 0;
+        virtual double GetMonotonicSec() const = 0;
+        virtual void OnPlatformSuspend() {}
+        virtual void OnPlatformResume() {}
+      };
+    notes: |
+      순수 C++ 추상 클래스 (UObject 미상속). Clock injection seam — 프로덕션 FRealClockSource와 테스트 FMockClockSource 교체.
+      OnPlatformSuspend/Resume: FRealClockSource가 FCoreDelegates 구독으로 OS suspend/resume 전파. FMockClockSource는 직접 호출 시뮬레이션.
+      OQ-6 RESOLVED (R3, 2026-04-17).
+    added: 2026-04-17
+    revised: ""
+
+  - name: FOnFarewellReached
+    status: active
+    source: design/gdd/time-session-system.md
+    referenced_by:
+      - design/gdd/time-session-system.md  # publisher (Rule 3 LONG_GAP_SILENT + Rule 4 NormalCompletion)
+      - design/gdd/game-state-machine.md   # re-emitter on Farewell state entry
+    signature: "DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnFarewellReached, EFarewellReason, Reason)"
+    notes: |
+      Time이 Rule 3/4로 발행. GSM이 Farewell 상태 진입 시 re-emit.
+      **Subscriber**: Farewell Archive #17 (VS 미작성 상태 — Farewell Archive GDD 작성 시 referenced_by에 추가).
+    added: 2026-04-16
+    revised: 2026-04-19  # referenced_by 역할 명시 + Farewell Archive VS 상태 주석 (N-G3)
+
+  - name: FOnDayAdvanced
+    status: active
+    source: design/gdd/time-session-system.md
+    referenced_by:
+      - design/gdd/time-session-system.md
+      - design/gdd/data-pipeline.md
+      - design/gdd/game-state-machine.md
+      - design/gdd/growth-accumulation-engine.md
+      - design/gdd/card-system.md  # added 2026-04-18 — deck regeneration trigger
+    signature: "DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDayAdvanced, int32, NewDayIndex)"
+    notes: |
+      Card System과 Dream Trigger가 구독.
+      Data Pipeline Section C Interactions: Dream Trigger가 이 delegate 수신 후 트리거 평가
+      직전에 Pipeline.GetAllDreamAssets()를 pull (인용용 — Pipeline 자체는 구독 안 함).
+    added: 2026-04-16
+    revised: 2026-04-17
+
+  - name: OnInputModeChanged
+    status: active
+    source: design/gdd/input-abstraction-layer.md
+    referenced_by:
+      - design/gdd/input-abstraction-layer.md
+    signature: "DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnInputModeChanged, EInputMode, NewMode)"
+    notes: |
+      입력 장치 전환 시 발행. Card Hand UI, Window & Display, GSM이 구독.
+      전환은 자동 감지 (마지막 입력 장치). Hysteresis threshold 적용.
+      알림·팝업·모달 없음 (Pillar 1).
+    added: 2026-04-17
+    revised: ""
+
+  - name: FOnLoadComplete
+    status: active
+    source: design/gdd/save-load-persistence.md
+    referenced_by:
+      - design/gdd/save-load-persistence.md
+      - design/gdd/game-state-machine.md
+    signature: "DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnLoadComplete, bool, bFreshStart, bool, bHadPreviousData)"
+    notes: |
+      Save/Load Initialize 종료 후 1회 발행. 4-quadrant 신호:
+      - (true, false): 진짜 첫 실행 → GSM 표준 Dawn
+      - (true, true): 손상 fallback → Title&Settings UI "이끼 아이는 깊이 잠들었습니다" 분기
+      - (false, _): 정상 resume → GSM 마지막 상태 복원
+      Game State Machine + Title & Settings UI가 구독.
+      one-shot delegate (반복 발행 안 함).
+    added: 2026-04-16
+    revised: ""
+
+  - name: FOnGameStateChanged
+    status: active
+    source: design/gdd/game-state-machine.md
+    referenced_by:
+      - design/gdd/game-state-machine.md
+      - design/gdd/moss-baby-character-system.md
+    signature: "DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnGameStateChanged, EGameState, OldState, EGameState, NewState)"
+    # was: OneParam(NewState) before 2026-04-17 — R2 review (R5) expanded to TwoParams for OldState→NewState distinction
+    notes: |
+      GSM 상태 전환 시 MPC 블렌드 시작 시점에 발행. 7개 downstream 구독:
+      Moss Baby Character, Lumen Dusk Scene, Card Hand UI, Dream Journal UI (MVP) + Audio, Title UI, Farewell Archive (VS).
+      UPROPERTY(BlueprintAssignable). OldState 포함 — Dream→Waiting 복귀와 Offering→Waiting 진입 구분 필요,
+      Farewell Archive는 "어떤 상태에서 Farewell 도달했는가" 필요.
+    added: 2026-04-17
+    revised: 2026-04-17
+
+  - name: OnBudgetRestored
+    status: active
+    source: design/gdd/stillness-budget.md
+    referenced_by:
+      - design/gdd/stillness-budget.md
+    signature: "DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnBudgetRestored, EStillnessChannel, Channel)"
+    notes: |
+      ReducedMotion OFF 복귀 시 채널별 발행.
+      Motion/Particle 각각 1회. Sound는 RM 영향 밖이므로 미발행.
+      소비자가 구독하여 재요청 트리거. 미구독 소비자는 다음 자연 이벤트에서 Request.
+    added: 2026-04-17
+    revised: ""
+
+  - name: FOnGrowthStageChanged
+    status: active
+    source: design/gdd/growth-accumulation-engine.md
+    referenced_by:
+      - design/gdd/growth-accumulation-engine.md
+      - design/gdd/moss-baby-character-system.md
+    signature: "DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnGrowthStageChanged, EGrowthStage, NewStage)"
+    notes: |
+      Growth Engine이 CR-4 단계 평가 후 변경 시 발행. MBC가 GrowthTransition 실행.
+      다단계 건너뛰기 시 최종 단계만 1회 발행 (CR-4, EC-10).
+      MBC OQ-1 해소: 인터페이스 확정 (2026-04-17).
+    added: 2026-04-17
+    revised: ""
+
+  - name: FOnFinalFormReached
+    status: active
+    source: design/gdd/growth-accumulation-engine.md
+    referenced_by:
+      - design/gdd/growth-accumulation-engine.md
+      - design/gdd/moss-baby-character-system.md
+    signature: "DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnFinalFormReached, FName, FinalFormId)"
+    notes: |
+      Day = GameDurationDays에 1회 발행. MBC가 FinalReveal 실행.
+      로드 시 Resolved 직행이면 1회 재발행 (EC-17).
+      MBC OQ-1 해소: 인터페이스 확정 (2026-04-17).
+    added: 2026-04-17
+    revised: ""
+
+  - name: FOnCardOffered
+    status: active
+    source: design/gdd/card-system.md
+    referenced_by:
+      - design/gdd/card-system.md
+      - design/gdd/growth-accumulation-engine.md  # Stage 1 subscriber — Growth가 태그 가산 + Stage 2 forwarding
+      - design/gdd/moss-baby-character-system.md  # Stage 1 subscriber — Reacting 즉시 시각 반응 (ADR-0005 — 시각 즉시성 보존)
+    signature: "DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCardOffered, FName, CardId)"
+    notes: |
+      카드 건넴 확정 시 1회 발행 (Stage 1 — ADR-0005 2026-04-19).
+      하루 최대 1회 보장 (CR-CS-4 검증 게이트).
+      Card System이 source. Stage 1 subscribers: Growth (태그 가산 + Stage 2 forwarding), MBC (Reacting 즉시 시각 반응).
+      타입 해소 (2026-04-18): Growth/GSM GDD의 FGuid 참조는 stale — 정식 타입은 FName.
+      ADR-0005 (2026-04-19): GSM과 Dream Trigger는 Stage 2 FOnCardProcessedByGrowth 구독으로 전환 — referenced_by에서 제거됨.
+    added: 2026-04-18
+    revised: 2026-04-19  # ADR-0005 — GSM 제거 (Stage 2로 이전), MBC는 시각 즉시성 위해 Stage 1 유지
+
+  - name: FOnCardProcessedByGrowth
+    status: active
+    source: design/gdd/growth-accumulation-engine.md
+    referenced_by:
+      - design/gdd/growth-accumulation-engine.md  # publisher
+      - design/gdd/game-state-machine.md          # subscriber — Offering→Waiting or Day 21 Farewell P0
+      - design/gdd/dream-trigger-system.md        # subscriber — CR-1 평가 (최신 TagVector 보장)
+      - design/gdd/card-system.md                 # Stage 2 forwarding 설명에서 언급
+    signature: "DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnCardProcessedByGrowth, const FGrowthProcessResult&, Result)"
+    notes: |
+      Stage 2 delegate — ADR-0005 (2026-04-19) 도입.
+      Growth가 CR-1 태그 가산 + CR-5 EvaluateFinalForm + SaveAsync 완료 후 **마지막 statement**로 발행.
+      UE Multicast Delegate 등록 순서 비공개 계약 회피 — C++ 호출 스택 순서로 Growth → GSM/Dream 전개 강제.
+      Day 21 Final Form 정확성의 중심 (Cross-review D-2 해소).
+      Subscribers: GSM (Waiting/Farewell P0 전환), Dream Trigger (CR-1 희소성 게이트 평가).
+    added: 2026-04-19
+    revised: ""
+
+  - name: FOnDreamTriggered
+    status: active
+    source: design/gdd/dream-trigger-system.md
+    referenced_by:
+      - design/gdd/dream-trigger-system.md  # publisher — CR-4 step 5
+      - design/gdd/game-state-machine.md    # subscriber — Waiting → Dream 전환 요청
+    signature: "DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDreamTriggered, FName, DreamId)"
+    notes: |
+      Dream Trigger CR-4 처리 완료 + SaveAsync(EDreamReceived) 완료 후 발행.
+      GSM이 Stillness Budget Narrative 슬롯 획득 시도 → 성공 시 Waiting → Dream 전환, 실패 시 연기 (E5).
+      Dream Trigger는 FDreamState.PendingDreamId로 연기 상태 영속화.
+      Pillar 3 (말할 때만 말한다) 희소성 게이트의 최종 출력.
+    added: 2026-04-19  # N-G1 registry 누락 해소
+    revised: ""

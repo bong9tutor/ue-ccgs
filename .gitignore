@@ -60,3 +60,7 @@ Desktop.ini
 
 # Cygwin / MSYS crash dumps
 *.stackdump
+
+# Python bytecode (prototypes/)
+__pycache__/
+*.py[cod]

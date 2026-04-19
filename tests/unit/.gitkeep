@@ -1,0 +1,3 @@
+# This directory holds unit test *catalog* references.
+# Actual C++ test source lives in MadeByClaudeCode/Source/MadeByClaudeCode/Tests/
+# (UE Automation Framework requires .cpp in the engine module).
