@@ -3,12 +3,17 @@
 // DataPipelineSubsystem.cpp — Data Pipeline 메인 서브시스템 구현
 //
 // Story-1-5: UDataPipelineSubsystem 뼈대 + 4-state machine + pull API 스텁
-// ADR-0003: Sync 일괄 로드 채택
+// Story-1-6: Initialize 4단계 실제 구현 + RegisterXxx helpers + DegradedFallback
+// ADR-0003: Sync 일괄 로드 채택 (Card → FinalForm → Dream → Stillness 순서 고정)
 // ADR-0002: 컨테이너 선택
 //
-// 현재 뼈대 단계:
-//   - Initialize(): Uninitialized → Loading → Ready 전이 (빈 레지스트리)
-//   - 실제 카탈로그 등록 로직은 Story 1-6에서 구현 (RegisterCard/FinalForm/Dream/StillnessCatalog)
+// 구현 단계:
+//   - Initialize(): 4단계 RegisterXxx() 호출 → Ready / DegradedFallback 전이
+//   - RegisterCardCatalog(): DataTable RowStruct 검증 (Story 1-15 ini 연동 전 skeleton)
+//   - RegisterFinalFormCatalog(): UAssetManager PrimaryAsset type-bulk load
+//   - RegisterDreamCatalog(): UAssetManager PrimaryAsset type-bulk load
+//   - RegisterStillnessCatalog(): single DataAsset load
+//   - EnterDegradedFallback(): 공통 DegradedFallback 진입 처리
 //   - pull API: checkf 가드 + Fail-close 빈 반환 (NAME_None, 없는 ID)
 //   - RefreshCatalog(): no-op (Story 1-7에서 hot-swap 로직 구현)
 //
@@ -17,6 +22,7 @@
 
 #include "Data/DataPipelineSubsystem.h"
 #include "Engine/DataTable.h"
+#include "Engine/AssetManager.h"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Log Category
@@ -34,36 +40,198 @@ void UDataPipelineSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
     // 4-state machine: Uninitialized → Loading
     CurrentState = EDataPipelineState::Loading;
-    UE_LOG(LogDataPipeline, Log, TEXT("DataPipelineSubsystem: Loading 상태 진입"));
+    FailedCatalogs.Empty();
 
-    // ── Story 1-6에서 구현 예정 ────────────────────────────────────────────────
-    //
-    // ADR-0003 §구체 로드 순서 (R2 deterministic):
-    //   Step 1: Card DataTable  → RegisterCardCatalog()
-    //   Step 2: FinalForm bucket → RegisterFinalFormCatalog()
-    //   Step 3: Dream bucket    → RegisterDreamCatalog()
-    //   Step 4: Stillness       → RegisterStillnessCatalog()
-    //
-    // 각 Step 실패 시 → DegradedFallback 전이 + FailedCatalogs 추가 + 즉시 return.
-    //
-    // 3단계 T_init 임계 로그 (ADR-0003 §T_init 성능 예산):
-    //   Normal   ≤ 50ms     : 정보 로그
-    //   Warning  ≤ 52.5ms   : UE_LOG Warning
-    //   Error    ≤ 75ms     : UE_LOG Error + Async Bundle 전환 검토 flag
-    //   Fatal    > 100ms    : UE_LOG Fatal (Shipping 포함)
-    //
-    // 현재 뼈대: empty registries 상태로 Ready 전이 (AC-DP-01 skeleton 충족).
-    // ──────────────────────────────────────────────────────────────────────────
+    const double StartTime = FPlatformTime::Seconds();
 
-    // Loading → Ready 전이 (뼈대 단계 — 빈 레지스트리)
+    // ── Step 1: Card DataTable (ADR-0003 §구체 로드 순서 R2 deterministic) ────
+    UE_LOG(LogDataPipeline, Log, TEXT("Registering Card catalog..."));
+    if (!RegisterCardCatalog())
+    {
+        EnterDegradedFallback(TEXT("Card"), TEXT("Card DataTable registration failed"));
+        return; // AC-DP-03: 이후 단계 시도하지 않음 (즉시 return)
+    }
+
+    // ── Step 2: FinalForm DataAsset bucket ────────────────────────────────────
+    UE_LOG(LogDataPipeline, Log, TEXT("Registering FinalForm catalog..."));
+    if (!RegisterFinalFormCatalog())
+    {
+        EnterDegradedFallback(TEXT("FinalForm"), TEXT("FinalForm catalog registration failed"));
+        return; // AC-DP-03: 즉시 return
+    }
+
+    // ── Step 3: Dream DataAsset bucket ───────────────────────────────────────
+    UE_LOG(LogDataPipeline, Log, TEXT("Registering Dream catalog..."));
+    if (!RegisterDreamCatalog())
+    {
+        EnterDegradedFallback(TEXT("Dream"), TEXT("Dream catalog registration failed"));
+        return; // AC-DP-03: 즉시 return
+    }
+
+    // ── Step 4: Stillness single DataAsset ───────────────────────────────────
+    UE_LOG(LogDataPipeline, Log, TEXT("Registering Stillness catalog..."));
+    if (!RegisterStillnessCatalog())
+    {
+        EnterDegradedFallback(TEXT("Stillness"), TEXT("Stillness catalog registration failed"));
+        return; // AC-DP-03: 즉시 return
+    }
+
+    // 4단계 모두 성공 → Ready 전이
+    // T_init 측정 (로그 전용 — ADR-0001 비위반: 시간 로직 아닌 순수 로그 목적)
+    const double Elapsed = (FPlatformTime::Seconds() - StartTime) * 1000.0;
+    UE_LOG(LogDataPipeline, Log, TEXT("Pipeline Ready — T_init = %.2f ms"), Elapsed);
+
+    // 3단계 T_init 임계 로그 (ADR-0003 §T_init 성능 예산) — Story 1-19에서 완성
+    // Normal ≤ 50ms / Warning ≤ 52.5ms / Error ≤ 75ms / Fatal > 100ms
+
     CurrentState = EDataPipelineState::Ready;
-    UE_LOG(LogDataPipeline, Log,
-        TEXT("DataPipelineSubsystem: Ready 상태 확정 (뼈대 — 실제 카탈로그 Story 1-6 구현 예정)"));
 
-    // OnLoadComplete 발행
-    // bFreshStart: Story 1-7 Save/Load 연동 후 실제 값 결정.
-    // bHadPreviousData: Story 1-7 Save/Load 연동 후 실제 값 결정.
+    // OnLoadComplete 발행 (Ready 진입)
+    // bFreshStart / bHadPreviousData: Story 1-7 Save/Load 연동 후 실제화.
     OnLoadComplete.Broadcast(/*bFreshStart*/ true, /*bHadPreviousData*/ false);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DegradedFallback 공통 처리 (AC-DP-03)
+// ─────────────────────────────────────────────────────────────────────────────
+
+void UDataPipelineSubsystem::EnterDegradedFallback(const FName& FailedCatalog, const FString& Reason)
+{
+    CurrentState = EDataPipelineState::DegradedFallback;
+    FailedCatalogs.Add(FailedCatalog);
+    UE_LOG(LogDataPipeline, Error, TEXT("%s — %s"), *Reason, *FailedCatalog.ToString());
+
+    // Broadcast — DegradedFallback 진입 시에도 발행 (downstream이 상태 인지 가능)
+    OnLoadComplete.Broadcast(/*bFreshStart*/ true, /*bHadPreviousData*/ false);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RegisterCardCatalog — Step 1
+// ─────────────────────────────────────────────────────────────────────────────
+
+bool UDataPipelineSubsystem::RegisterCardCatalog()
+{
+    // Card DataTable 경로는 DefaultGame.ini / Build configuration에서 지정 예정 (Story 1-15).
+    // 뼈대 단계: CardTable 미주입 시 Warning만 출력 후 return true (empty OK).
+    if (!CardTable)
+    {
+        UE_LOG(LogDataPipeline, Warning,
+            TEXT("Card DataTable not assigned — Story 1-15 ini 설정 후 자동 주입 예정"));
+        return true; // empty OK — CardTable 없어도 Ready 허용
+    }
+
+    // DataTable RowStruct 타입 검증 (C1 schema gate — ADR-0002)
+    if (CardTable->RowStruct != FGiftCardRow::StaticStruct())
+    {
+        UE_LOG(LogDataPipeline, Error,
+            TEXT("Card DataTable RowStruct mismatch — expected FGiftCardRow, got '%s'"),
+            CardTable->RowStruct ? *CardTable->RowStruct->GetName() : TEXT("null"));
+        return false; // 치명적 실패 → DegradedFallback
+    }
+
+    return true;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RegisterFinalFormCatalog — Step 2
+// ─────────────────────────────────────────────────────────────────────────────
+
+bool UDataPipelineSubsystem::RegisterFinalFormCatalog()
+{
+    UAssetManager& AssetMgr = UAssetManager::Get();
+
+    TArray<FPrimaryAssetId> FormIds;
+    AssetMgr.GetPrimaryAssetIdList(FPrimaryAssetType("FinalForm"), FormIds);
+
+    if (FormIds.Num() == 0)
+    {
+        // DefaultEngine.ini PrimaryAssetTypesToScan 미등록 — Story 1-15 대기
+        UE_LOG(LogDataPipeline, Warning,
+            TEXT("FinalForm PrimaryAssetType empty — Story 1-15 ini 등록 대기"));
+        return true; // empty OK
+    }
+
+    // sync 로드 (ADR-0003: UAssetManager::LoadPrimaryAssets sync variant)
+    TArray<FName> Bundles;
+    AssetMgr.LoadPrimaryAssets(FormIds, Bundles);
+
+    for (const FPrimaryAssetId& Id : FormIds)
+    {
+        UMossFinalFormAsset* Asset = Cast<UMossFinalFormAsset>(AssetMgr.GetPrimaryAssetObject(Id));
+        if (!Asset) { continue; }
+        FormRegistry.Add(Asset->FormId, Asset);
+    }
+
+    return true;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RegisterDreamCatalog — Step 3
+// ─────────────────────────────────────────────────────────────────────────────
+
+bool UDataPipelineSubsystem::RegisterDreamCatalog()
+{
+    UAssetManager& AssetMgr = UAssetManager::Get();
+
+    TArray<FPrimaryAssetId> DreamIds;
+    AssetMgr.GetPrimaryAssetIdList(FPrimaryAssetType("DreamData"), DreamIds);
+
+    if (DreamIds.Num() == 0)
+    {
+        // DefaultEngine.ini PrimaryAssetTypesToScan 미등록 — Story 1-15 대기.
+        // 빈 카탈로그는 실패가 아닌 정상 (사용자가 꿈 미정의 상태 허용).
+        UE_LOG(LogDataPipeline, Warning,
+            TEXT("DreamData PrimaryAssetType empty — DefaultEngine.ini PrimaryAssetTypesToScan 미등록 (Story 1-15)"));
+        return true; // empty OK
+    }
+
+    // sync 로드 (ADR-0003: UAssetManager::LoadPrimaryAssets sync variant)
+    TArray<FName> Bundles;
+    AssetMgr.LoadPrimaryAssets(DreamIds, Bundles);
+
+    for (const FPrimaryAssetId& Id : DreamIds)
+    {
+        UDreamDataAsset* Asset = Cast<UDreamDataAsset>(AssetMgr.GetPrimaryAssetObject(Id));
+        if (!Asset) { continue; }
+        DreamRegistry.Add(Asset->DreamId, Asset);
+    }
+
+    return true;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RegisterStillnessCatalog — Step 4
+// ─────────────────────────────────────────────────────────────────────────────
+
+bool UDataPipelineSubsystem::RegisterStillnessCatalog()
+{
+    UAssetManager& AssetMgr = UAssetManager::Get();
+
+    TArray<FPrimaryAssetId> BudgetIds;
+    AssetMgr.GetPrimaryAssetIdList(FPrimaryAssetType("StillnessBudget"), BudgetIds);
+
+    if (BudgetIds.Num() == 0)
+    {
+        // StillnessBudget 자산 없음 — consumer가 default 값 사용
+        UE_LOG(LogDataPipeline, Warning,
+            TEXT("StillnessBudget asset not found — default values will be used by consumers"));
+        return true; // empty OK — StillnessAsset == nullptr은 consumer가 처리
+    }
+
+    // ADR-0002: single instance 정책 — 첫 번째만 사용
+    TArray<FName> Bundles;
+    AssetMgr.LoadPrimaryAssets({BudgetIds[0]}, Bundles);
+
+    StillnessAsset = Cast<UStillnessBudgetAsset>(AssetMgr.GetPrimaryAssetObject(BudgetIds[0]));
+
+    if (!StillnessAsset)
+    {
+        UE_LOG(LogDataPipeline, Error,
+            TEXT("StillnessBudget asset load failed — cast mismatch (expected UStillnessBudgetAsset)"));
+        return false; // 치명적 실패 → DegradedFallback
+    }
+
+    return true;
 }
 
 void UDataPipelineSubsystem::Deinitialize()

@@ -6,7 +6,7 @@ goal: "Foundation 4 시스템의 뼈대와 핵심 계약 확립 — Core sprint 
 start: "2026-04-21"
 end: "2026-05-02"
 generated: "2026-04-19"
-updated: "2026-04-19 (Story 1-1~1-5 COMPLETE)"
+updated: "2026-04-19 (Story 1-1~1-6 COMPLETE — Pipeline epic 마무리)"
 
 stories:
   # === Must Have (Critical Path — Foundation skeleton) ===
@@ -70,12 +70,12 @@ stories:
     name: "Pipeline 004 — Catalog Registration Loading + DegradedFallback"
     file: "production/epics/foundation-data-pipeline/story-004-catalog-registration-loading.md"
     priority: must-have
-    status: backlog
-    owner: ""
+    status: done
+    owner: "unreal-specialist"
     estimate_days: 0.7
     depends_on: ["1-5"]
     blocker: ""
-    completed: ""
+    completed: "2026-04-19"
 
   - id: "1-7"
     name: "Save/Load 001 — UMossSaveData USaveGame + ESaveReason + Settings"

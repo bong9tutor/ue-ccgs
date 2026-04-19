@@ -130,3 +130,74 @@ ADR-0003 §AC-DP-13 권고에 따라 Shipping에서도 유지가 권장되며,
 - ADR-0003: Data Pipeline 로딩 전략 — Sync 일괄 로드 채택 (4-state machine)
 - ADR-0002: Data Pipeline 컨테이너 선택 (pull API 반환 타입 근거)
 - ADR-0010: FFinalFormRow 저장 형식 — FMossFinalFormData read-only view 근거
+
+---
+
+## Story 1-6 — Catalog Registration Loading + DegradedFallback
+
+### 실제 테스트 파일
+
+```
+MadeByClaudeCode/Source/MadeByClaudeCode/Tests/DataPipelineCatalogTests.cpp
+```
+
+### 카테고리
+
+```
+MossBaby.Data.Pipeline.Catalog.*
+```
+
+### 헤드리스 실행 명령
+
+```bash
+UnrealEditor-Cmd.exe MadeByClaudeCode.uproject \
+  -ExecCmds="Automation RunTests MossBaby.Data.Pipeline.Catalog.; Quit" \
+  -nullrhi -nosound -log -unattended
+```
+
+### AC 매핑
+
+| Automation Test | AC | 타입 | Gate |
+|---|---|---|---|
+| `MossBaby.Data.Pipeline.Catalog.ClearAll` | TestingClearAll 레지스트리 초기화 확인 | AUTOMATED | BLOCKING |
+| `MossBaby.Data.Pipeline.Catalog.CardTableInjection` | AC-DP-04 (Card Fail-close — NAME_None, nonexistent) | AUTOMATED | BLOCKING |
+| `MossBaby.Data.Pipeline.Catalog.DreamRegistrationFlow` | AC-DP-05 (Dream pull API 정상 + Fail-close, nullptr 금지) | AUTOMATED | BLOCKING |
+| `MossBaby.Data.Pipeline.Catalog.FinalFormRegistrationFlow` | AC-DP-05 (FinalForm pull API 정상 + Fail-close, ADR-0010 FromAsset 변환) | AUTOMATED | BLOCKING |
+| `MossBaby.Data.Pipeline.Catalog.StillnessAsset` | Stillness 주입/미주입 GetStillnessBudgetAsset 반환 | AUTOMATED | BLOCKING |
+| `MossBaby.Data.Pipeline.Catalog.DegradedFallbackState` | AC-DP-03 (DegradedFallback IsReady==false, GetState, GetFailedCatalogs) | AUTOMATED | BLOCKING |
+
+### AC 커버리지 상세
+
+- **AC-DP-02** (등록 순서 Card→FinalForm→Dream→Stillness): Initialize 구현 확인
+  (Initialize 직접 호출은 FSubsystemCollectionBase 귀속으로 불가 — integration test로 분리)
+- **AC-DP-03** (DegradedFallback 진입): `FDataPipelineDegradedFallbackStateTest` + `EnterDegradedFallback` helper 구현
+- **AC-DP-04** (fail-close Card): Story 1-5 `FDataPipelinePullAPIReturnsEmptyOnReadyTest` + Story 1-6 `FDataPipelineCardTableInjectionTest` 보완 커버
+- **AC-DP-05** (fail-close Dream/Growth): `FDataPipelineDreamRegistrationFlowTest` + `FDataPipelineFinalFormRegistrationFlowTest`
+- **AC-DP-06** [5.6-VERIFY] UEditorValidator: **DEFERRED** — tech-debt TD-007 (별도 Editor-module story)
+- **AC-DP-16** Unknown CardId warning: Story 1-5 `GetCardRow` 구현에 UE_LOG 포함, integration 재검증 불필요
+
+### Integration test 미작성 근거
+
+`Initialize()` full path (4단계 순서 확인 + DegradedFallback 실제 전이)는 `UGameInstance` 생성 필요.
+TD-005 lifecycle integration story에 포함 예정.
+
+### Deferred / Tech-debt
+
+| 항목 | 내용 | 추적 ID |
+|---|---|---|
+| AC-DP-06 UEditorValidator | UEditorValidatorBase + UnrealEd/DataValidation 모듈 — Editor-only. 별도 story | TD-007 |
+| Initialize integration test | FSubsystemCollectionBase / UGameInstance 생성 필요 — lifecycle integration | TD-005 |
+
+### 생성/수정 파일
+
+| 파일 | 역할 |
+|---|---|
+| `MadeByClaudeCode/Source/MadeByClaudeCode/Data/DataPipelineSubsystem.h` | private helpers + 테스트 훅 추가 |
+| `MadeByClaudeCode/Source/MadeByClaudeCode/Data/DataPipelineSubsystem.cpp` | Initialize 4단계 구현 + RegisterXxx helpers + EnterDegradedFallback |
+| `MadeByClaudeCode/Source/MadeByClaudeCode/Tests/DataPipelineCatalogTests.cpp` | UE Automation 테스트 6개 (신규) |
+
+### 관련 ADR
+
+- ADR-0003: Data Pipeline 로딩 전략 — Sync 일괄 로드 채택 (4단계 순서 + DegradedFallback 정책)
+- ADR-0002: Data Pipeline 컨테이너 선택 (C1/C2 schema gate)
+- ADR-0010: FFinalFormRow 저장 형식 — FMossFinalFormData read-only view (FromAsset 변환)

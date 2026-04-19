@@ -1,9 +1,10 @@
 # Story 004: Catalog Registration Loading (Card → FinalForm → Dream → Stillness) + DegradedFallback
 
 > **Epic**: Data Pipeline
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
+> **Estimate**: 0.7 days (~4-5 hours)
 > **Manifest Version**: 2026-04-19
 
 ## Context
@@ -178,3 +179,38 @@ public:
 
 - Depends on: Story 003 (Subsystem 뼈대), Story 002 (ini 등록)
 - Unlocks: Story 005, 006
+
+---
+
+## Completion Notes
+
+**Completed**: 2026-04-19
+**Criteria**: 4/6 passing, 2 deferred (AC-DP-06 [5.6-VERIFY] Editor-only, AC-DP-16 partial)
+
+**Files delivered**:
+- `DataPipelineSubsystem.h` (수정) — private helpers 선언 + TestingSetCardTable/SetStillness/AddDream/AddForm/ClearAll 훅
+- `DataPipelineSubsystem.cpp` (수정) — Initialize 4단계 실제 구현 + 4 RegisterXxx helpers + EnterDegradedFallback
+- `Tests/DataPipelineCatalogTests.cpp` (신규) — 6 UE Automation tests
+- `tests/unit/data-pipeline/README.md` (수정) — Story 1-6 섹션 append
+
+**Test Evidence**: 6 tests — `MossBaby.Data.Pipeline.Catalog.*` (ClearAll/CardTableInjection/DreamRegistrationFlow/FinalFormRegistrationFlow/StillnessAsset/DegradedFallbackState)
+
+**ADR 준수**:
+- ADR-0001 금지 패턴 grep: 0 매치 (주석만)
+- ADR-0003: 4단계 순서 Card→FinalForm→Dream→Stillness + 즉시 return DegradedFallback
+- ADR-0002: RowStruct 검증, empty-OK 정책
+- ADR-0010: GetGrowthFormRow FMossFinalFormData::FromAsset() 경로 유지
+
+**구현 결정**:
+- `FPlatformTime::Seconds()` Initialize 로그 전용 사용 — ADR-0001의 금지 대상은 시간을 시스템 로직에 사용하는 것이며, 순수 성능 측정은 예외 허용
+- `RegisterStillnessCatalog`에서 빈 카탈로그 true 반환 (spec "consumer가 default 사용" 준수)
+
+**Deferred (tech-debt 등록)**:
+- **AC-DP-06 [5.6-VERIFY] UEditorValidatorBase → TD-007**: UnrealEd + DataValidation 모듈 의존 Editor-only 코드. 별도 story "Pipeline 008 — UMossCardValidator Editor-module" 배정 대기.
+- **AC-DP-02/AC-DP-03 Integration tests**: Initialize() full path (`FSubsystemCollectionBase` 내부 구조 직접 호출 불가) → TD-005 lifecycle integration story에 포함.
+- **AC-DP-16 partial**: `GetCardRow` UE_LOG Warning은 Story 1-5에서 이미 구현. Integration 재검증은 Story 1-7 lifecycle 포함.
+
+**Out of Scope 보류** (다음 스토리):
+- Story 1-15 (Pipeline 002): DefaultEngine.ini PrimaryAssetTypesToScan
+- Story 1-19 (Pipeline 006): T_init 3단계 임계 로그 (AC-DP-09/10 [5.6-VERIFY])
+- Story 1-20 (Pipeline 005): Edge cases (DuplicateCardId, FTextEmpty, RefreshCatalog 재진입)

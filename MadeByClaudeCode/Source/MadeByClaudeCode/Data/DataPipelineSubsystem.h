@@ -3,6 +3,7 @@
 // DataPipelineSubsystem.h — Data Pipeline 메인 서브시스템 선언
 //
 // Story-1-5: UDataPipelineSubsystem 뼈대 + 4-state machine + pull API 스텁
+// Story-1-6: Initialize 4단계 실제 구현 + RegisterXxx helpers + DegradedFallback
 // ADR-0003: Sync 일괄 로드 채택 (4-state machine, sync return contract)
 // ADR-0002: 컨테이너 선택 (Card=DT, FinalForm=DataAsset, Dream=DataAsset, Stillness=DataAsset)
 // ADR-0010: FMossFinalFormData read-only view struct (UObject 직접 노출 회피)
@@ -27,7 +28,6 @@
 //   이 Subsystem에 의존하는 Subsystem은 Initialize에서 반드시
 //   Collection.InitializeDependency<UDataPipelineSubsystem>() 호출.
 //
-// Story 1-6에서 실제 카탈로그 등록 로직 구현 예정.
 // Story 1-7에서 Save/Load 연동 + OnLoadComplete 파라미터 실제화 예정.
 //
 // ADR-0001 금지: tamper, cheat, bIsForward, bIsSuspicious,
@@ -247,9 +247,86 @@ public:
      * @param NewState  강제 설정할 상태.
      */
     void TestingSetState(EDataPipelineState NewState) { CurrentState = NewState; }
+
+    /**
+     * [테스트 전용] CardTable 직접 주입.
+     * RegisterCardCatalog() 경로 우회 — 단위 테스트용. 프로덕션 코드에서 절대 호출 금지.
+     * @param InTable  주입할 UDataTable. nullptr 허용.
+     */
+    void TestingSetCardTable(UDataTable* InTable) { CardTable = InTable; }
+
+    /**
+     * [테스트 전용] StillnessAsset 직접 주입.
+     * RegisterStillnessCatalog() 경로 우회 — 단위 테스트용. 프로덕션 코드에서 절대 호출 금지.
+     * @param InAsset  주입할 UStillnessBudgetAsset. nullptr 허용.
+     */
+    void TestingSetStillnessAsset(UStillnessBudgetAsset* InAsset) { StillnessAsset = InAsset; }
+
+    /**
+     * [테스트 전용] DreamRegistry에 자산 추가.
+     * RegisterDreamCatalog() 경로 우회 — 단위 테스트용. 프로덕션 코드에서 절대 호출 금지.
+     * @param Id     레지스트리 키.
+     * @param Asset  추가할 UDreamDataAsset. nullptr 시 무시.
+     */
+    void TestingAddDreamAsset(FName Id, UDreamDataAsset* Asset) { if (Asset) DreamRegistry.Add(Id, Asset); }
+
+    /**
+     * [테스트 전용] FormRegistry에 자산 추가.
+     * RegisterFinalFormCatalog() 경로 우회 — 단위 테스트용. 프로덕션 코드에서 절대 호출 금지.
+     * @param Id     레지스트리 키.
+     * @param Asset  추가할 UMossFinalFormAsset. nullptr 시 무시.
+     */
+    void TestingAddFormAsset(FName Id, UMossFinalFormAsset* Asset) { if (Asset) FormRegistry.Add(Id, Asset); }
+
+    /**
+     * [테스트 전용] 모든 레지스트리 + FailedCatalogs 클리어.
+     * 테스트 정리 단계에서 사용. 프로덕션 코드에서 절대 호출 금지.
+     */
+    void TestingClearAll()
+    {
+        CardTable = nullptr;
+        StillnessAsset = nullptr;
+        DreamRegistry.Empty();
+        FormRegistry.Empty();
+        FailedCatalogs.Empty();
+    }
 #endif
 
 private:
+    // ── Initialize 단계별 등록 helpers (ADR-0003 §구체 로드 순서) ──────────────
+
+    /**
+     * Step 1: Card DataTable 등록.
+     * @return true = 성공 또는 empty-OK. false = 치명적 실패 → DegradedFallback.
+     */
+    bool RegisterCardCatalog();
+
+    /**
+     * Step 2: FinalForm DataAsset bucket 등록 (UAssetManager PrimaryAsset type-bulk).
+     * @return true = 성공 또는 empty-OK. false = 치명적 실패 → DegradedFallback.
+     */
+    bool RegisterFinalFormCatalog();
+
+    /**
+     * Step 3: Dream DataAsset bucket 등록 (UAssetManager PrimaryAsset type-bulk).
+     * @return true = 성공 또는 empty-OK. false = 치명적 실패 → DegradedFallback.
+     */
+    bool RegisterDreamCatalog();
+
+    /**
+     * Step 4: Stillness single DataAsset 등록.
+     * @return true = 성공 또는 empty-OK. false = cast 실패 → DegradedFallback.
+     */
+    bool RegisterStillnessCatalog();
+
+    /**
+     * DegradedFallback 진입 공통 처리 (AC-DP-03).
+     * CurrentState = DegradedFallback + FailedCatalogs 추가 + Error 로그 + Broadcast.
+     * @param FailedCatalog  실패한 카탈로그 이름 (FailedCatalogs 배열에 추가).
+     * @param Reason         Error 로그에 출력할 원인 설명.
+     */
+    void EnterDegradedFallback(const FName& FailedCatalog, const FString& Reason);
+
     // ── State ──────────────────────────────────────────────────────────────────
 
     /** 현재 4-state machine 상태. 초기값 Uninitialized. */
