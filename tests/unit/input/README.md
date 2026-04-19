@@ -121,3 +121,18 @@ UnrealEditor-Cmd.exe MadeByClaudeCode.uproject \
   -ExecCmds="Automation RunTests MossBaby.Input.ModeDetection.; Quit" \
   -nullrhi -nosound -log -unattended
 ```
+
+---
+
+## Story-1-17 — Offer Hold Formula 2 + ApplySettingsToMappingContext
+
+- 실제 cpp: `MadeByClaudeCode/Source/MadeByClaudeCode/Tests/InputOfferHoldTests.cpp`
+- 카테고리: `MossBaby.Input.OfferHold.*`
+- AC 매핑:
+  - ApplySettingsToMappingContext null-safe: `FInputOfferHoldApplyNoOpOnNullAssetTest`
+  - Mock IMC HoldTimeThreshold 적용: `FInputOfferHoldApplyToMockIMCTest`
+  - 다중 Hold trigger 카운트 (Pressed 제외): `FInputOfferHoldApplyMultipleHoldTriggersTest`
+  - 다른 Action mapping 무시: `FInputOfferHoldApplyIgnoresWrongActionTest`
+- Formula 2: `OfferTriggered = HoldElapsed >= HoldThreshold` (inclusive `>=`, Formula 1 strict `>`과 대비)
+- IA_Select/IA_OfferCard 공유 키 해소: UE Enhanced Input implicit trigger priority (엔진 내장)
+- Deferred (TD-011): boundary 실제 런타임 검증 (Mouse 0.15s, Gamepad 0.5s) — Story 1-11 에셋 생성 후 PIE integration test

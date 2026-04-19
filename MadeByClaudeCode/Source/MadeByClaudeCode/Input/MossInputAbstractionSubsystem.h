@@ -5,8 +5,11 @@
 // Story-1-12: UMossInputAbstractionSubsystem + UMossInputAbstractionSettings + IMC 등록
 // Story-1-13: EInputMode auto-detect (Formula 1 hysteresis) + OnInputModeChanged delegate
 //             + APlayerController::SetShowMouseCursor 전환
+// Story-1-17: Offer Hold Formula 2 — ApplySettingsToMappingContext
+//             Settings knob → UInputTriggerHold::HoldTimeThreshold 반영
+//             에셋 null 시 no-op (TD-008 대기 상태 안전)
 // ADR-0011: Tuning Knob UDeveloperSettings 채택 참조
-// GDD: design/gdd/input-abstraction-layer.md §Core Rules / §Lifecycle / §Formula 1
+// GDD: design/gdd/input-abstraction-layer.md §Core Rules / §Lifecycle / §Formula 1 / §Formula 2
 //
 // AC 커버리지:
 //   AC-1: UMossInputAbstractionSettings 3 knobs — 별도 헤더 (MossInputAbstractionSettings.h)
@@ -15,14 +18,13 @@
 //   AC-4: EInputMode enum (Mouse, Gamepad)
 //   AC-5: 6 UInputAction + 2 UInputMappingContext UPROPERTY TObjectPtr 보관
 //   Story-1-13 AC: FOnInputModeChanged delegate + Formula 1 auto-detect + cursor 전환
+//   Story-1-17 AC: ApplySettingsToMappingContext null-safe +
+//                  UInputTriggerHold::HoldTimeThreshold 적용
 //
 // Story-1-11 에셋 미생성 정책:
 //   - LoadObject 반환값 null 허용 — crash 없이 동작
 //   - bMappingContextRegistered == false 유지 (에셋 생성 후 자동으로 true로 전환)
 //   - TD-008: Story-1-11 에셋 UE Editor 수동 생성 대기 중
-//
-// Story-1-17에서 추가 예정:
-//   - Offer Hold Formula 2 경계값 적용
 
 #pragma once
 #include "CoreMinimal.h"
@@ -122,6 +124,21 @@ public:
      */
     bool IsMappingContextRegistered() const { return bMappingContextRegistered; }
 
+    // ── Story-1-17: Settings → IMC Hold Trigger 반영 ─────────────────────────
+
+    /**
+     * Settings knob(OfferDragThresholdSec / OfferHoldDurationSec)을
+     * 각 IMC의 IA_OfferCard 매핑에 연결된 UInputTriggerHold::HoldTimeThreshold에 적용.
+     *
+     * 호출 시점: Initialize() 내 LoadInputAssets() 직후.
+     * null-safe: Settings 또는 IA_OfferCard / IMC 중 어느 하나라도 null이면 즉시 return (no-op).
+     * TD-008: Story-1-11 에셋 생성 전에는 IA_OfferCard null → 경고 로그 + no-op.
+     *
+     * Formula 2: OfferTriggered = HoldElapsed >= HoldThreshold (inclusive `>=`)
+     * Formula 1 strict `>` 와 대비 — UInputTriggerHold 엔진 구현이 `>=`를 사용함.
+     */
+    void ApplySettingsToMappingContext();
+
     // ── Story-1-13: Input Mode Auto-Detect (Formula 1 Hysteresis) ─────────────
 
     /**
@@ -207,6 +224,18 @@ public:
     void TestingSetCurrentMode(EInputMode Mode) { CurrentMode = Mode; }
 
     /**
+     * [테스트 전용] 단일 IMC에 대한 ApplyHoldThresholdToIMC 직접 호출.
+     * Mock IMC 주입 후 HoldTimeThreshold 적용 결과 검증용.
+     * @param IMC              대상 UInputMappingContext (null 허용 — 0 반환).
+     * @param TargetAction     Hold trigger를 탐색할 UInputAction (null 허용 — 0 반환).
+     * @param TargetHoldThreshold  적용할 HoldTimeThreshold 값(초).
+     * @return 변경된 UInputTriggerHold 개수.
+     */
+    int32 TestingApplySettingsToSingleIMC(UInputMappingContext* IMC,
+                                          const UInputAction* TargetAction,
+                                          float TargetHoldThreshold);
+
+    /**
      * [테스트 전용] 현재 로드된 Action 수 반환 (6개 중).
      * IMC는 포함하지 않음 (Action만 카운트).
      * @return IA_PointerMove ~ IA_Back 중 non-null 수 (0–6).
@@ -260,6 +289,26 @@ private:
      * @param PC  IMC를 등록할 PlayerController. null이면 no-op.
      */
     void RegisterMappingContext(APlayerController* PC);
+
+    // ── Story-1-17: Hold Threshold Helper ────────────────────────────────────
+
+    /**
+     * IMC 내 TargetAction에 매핑된 모든 UInputTriggerHold의 HoldTimeThreshold를 ThresholdSec로 설정.
+     *
+     * 구현 노트:
+     *   GetMappings()는 const TArray<FEnhancedActionKeyMapping>& 반환.
+     *   FEnhancedActionKeyMapping.Triggers는 TArray<TObjectPtr<UInputTrigger>>.
+     *   TObjectPtr<UInputTrigger>가 가리키는 UObject는 포인터 const와 무관하게 mutable.
+     *   따라서 Cast<UInputTriggerHold>(Trigger.Get())->HoldTimeThreshold = X 는 valid.
+     *
+     * @param IMC           대상 UInputMappingContext (null 허용 — 0 반환).
+     * @param TargetAction  탐색할 UInputAction (null 허용 — 0 반환).
+     * @param ThresholdSec  설정할 HoldTimeThreshold (초).
+     * @return 변경된 UInputTriggerHold 인스턴스 수.
+     */
+    int32 ApplyHoldThresholdToIMC(UInputMappingContext* IMC,
+                                  const UInputAction* TargetAction,
+                                  float ThresholdSec);
 
     // ── Story-1-13: Mode Transition ───────────────────────────────────────────
 

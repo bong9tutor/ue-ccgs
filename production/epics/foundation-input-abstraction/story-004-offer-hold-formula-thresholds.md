@@ -1,9 +1,10 @@
 # Story 004: Offer Hold Formula 2 — Mouse 0.15s / Gamepad 0.5s boundary + Select/OfferCard 공유 해소
 
 > **Epic**: Input Abstraction Layer
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
+> **Estimate**: 0.5 days (~3 hours)
 > **Manifest Version**: 2026-04-19
 
 ## Context
@@ -119,3 +120,37 @@ void UMossInputAbstractionSubsystem::ApplySettingsToMappingContext() {
 
 - Depends on: Story 001 (IA_OfferCard 에셋), Story 002 (Settings + Subsystem)
 - Unlocks: Story 005
+
+---
+
+## Completion Notes
+
+**Completed**: 2026-04-19
+**Criteria**: 4/6 AUTOMATED (unit level) + 2 deferred (boundary 실측 integration)
+
+**Files delivered**:
+- `Input/MossInputAbstractionSubsystem.h/.cpp` (수정) — ApplySettingsToMappingContext + ApplyHoldThresholdToIMC + TestingApplySettingsToSingleIMC 훅 + Initialize에 호출 추가
+- `Tests/InputOfferHoldTests.cpp` (신규, 4 tests)
+- `tests/unit/input/README.md` Story-1-17 섹션 append
+
+**Test Evidence**: 4 UE Automation — `MossBaby.Input.OfferHold.{ApplyNoOpOnNullAsset/ApplyToMockIMC/ApplyMultipleHoldTriggers/ApplyIgnoresWrongAction}`
+
+**AC 커버**:
+- [x] Null-safe ApplySettingsToMappingContext: ApplyNoOpOnNullAssetTest
+- [x] Mock IMC HoldTimeThreshold 적용: ApplyToMockIMCTest (0.15f)
+- [x] 다중 Hold trigger 카운트: ApplyMultipleHoldTriggersTest (Hold 2, Pressed 제외)
+- [x] 다른 Action mapping 무시: ApplyIgnoresWrongActionTest
+- [~] OFFER_HOLD_BOUNDARY_GAMEPAD/MOUSE (0.15/0.5s 실측): TD-011 — PIE integration test (TD-008 에셋 생성 후)
+- [x] IA_Select/IA_OfferCard 공유 키: UE Enhanced Input implicit trigger priority (엔진 내장)
+
+**ADR/Rule 준수**:
+- ADR-0001 grep: 0 매치
+- ADR-0008: Enhanced Input subscription 기반 Hold threshold 동적 반영
+- Formula 2 inclusive `>=` (Formula 1 strict `>`과 대비) — GDD §Formula 2 경계 설계 엄수
+
+**Deferred**:
+- OFFER_HOLD_BOUNDARY 런타임 실측: TD-011 (Story 1-11 에셋 + PIE 필요)
+- IA_OfferCard 에셋 Trigger 속성 자체: Story 1-11 에디터 작업 (TD-008)
+
+**Out of Scope**:
+- Story 1-21: NO_RAW_KEY_BINDING CI grep + Mouse-only MANUAL + Gamepad disconnect

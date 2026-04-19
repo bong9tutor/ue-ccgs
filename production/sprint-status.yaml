@@ -6,7 +6,7 @@ goal: "Foundation 4 시스템의 뼈대와 핵심 계약 확립 — Core sprint 
 start: "2026-04-21"
 end: "2026-05-02"
 generated: "2026-04-19"
-updated: "2026-04-19 (Must Have 12/13 + Should 1-14 COMPLETE, 1-11 awaiting-editor)"
+updated: "2026-04-19 (Must 12/13 + Should 4/4 COMPLETE, 1-11 awaiting-editor, 1-15 awaiting-cooked)"
 
 stories:
   # === Must Have (Critical Path — Foundation skeleton) ===
@@ -193,12 +193,12 @@ stories:
     name: "Input 004 — Offer Hold Formula 2 (Mouse 0.15s / Gamepad 0.20s)"
     file: "production/epics/foundation-input-abstraction/story-004-offer-hold-formula-thresholds.md"
     priority: should-have
-    status: backlog
-    owner: ""
+    status: done
+    owner: "unreal-specialist"
     estimate_days: 0.5
     depends_on: ["1-13"]
     blocker: ""
-    completed: ""
+    completed: "2026-04-19"
 
   # === Nice to Have (여유 시) ===
 

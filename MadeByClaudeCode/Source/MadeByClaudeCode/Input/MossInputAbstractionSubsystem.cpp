@@ -8,7 +8,7 @@
 // ADR-0011: Tuning Knob UDeveloperSettings 채택 참조
 // GDD: design/gdd/input-abstraction-layer.md §Formula 1 / §Rule 3
 //
-// Story-1-17에서 OfferHoldDurationSec Offer Hold Formula 2 연동 구현 예정.
+// Story-1-17: OfferHoldDurationSec Offer Hold Formula 2 연동 구현 완료.
 // Story-1-20에서 PlayerSpawn 이벤트 구독으로 지연된 IMC 등록 보완 예정.
 //
 // Story-1-11 에셋 미생성 정책:
@@ -21,6 +21,7 @@
 #include "Engine/LocalPlayer.h"
 #include "GameFramework/PlayerController.h"
 #include "EnhancedInputSubsystems.h"
+#include "InputTriggers.h"
 
 // LogMossInput: Input Abstraction 전용 로그 카테고리
 // 필터: -LogMossInput Verbose → 에셋 로드 상세 / Quiet → 경고만 출력
@@ -59,7 +60,11 @@ void UMossInputAbstractionSubsystem::Initialize(FSubsystemCollectionBase& Collec
     // 1. Input Asset 로드 (Story-1-11 에셋 없으면 null — crash 없음)
     LoadInputAssets();
 
-    // 2. IMC 등록 시도
+    // 2. Settings knob → IMC Hold Trigger 반영 (Story-1-17)
+    //    LoadInputAssets 직후 호출 — 에셋 null 시 no-op (TD-008 상태 안전)
+    ApplySettingsToMappingContext();
+
+    // 3. IMC 등록 시도
     //    APlayerController는 GameInstance 초기화 시점에 아직 없을 수 있음.
     //    (GameInstance::Init은 World / Controller 생성보다 먼저 호출될 수 있음)
     //
@@ -213,6 +218,73 @@ void UMossInputAbstractionSubsystem::RegisterMappingContext(APlayerController* P
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Story-1-17: Settings → IMC Hold Trigger 반영
+// ─────────────────────────────────────────────────────────────────────────────
+
+void UMossInputAbstractionSubsystem::ApplySettingsToMappingContext()
+{
+    const UMossInputAbstractionSettings* Settings = UMossInputAbstractionSettings::Get();
+    if (!Settings)
+    {
+        UE_LOG(LogMossInput, Warning,
+            TEXT("[MossInput] ApplySettingsToMappingContext: Settings null — 스킵"));
+        return;
+    }
+    if (!IA_OfferCard)
+    {
+        UE_LOG(LogMossInput, Log,
+            TEXT("[MossInput] ApplySettingsToMappingContext: IA_OfferCard null — "
+                 "Story-1-11 에셋 대기 중 (TD-008), no-op"));
+        return;
+    }
+
+    int32 MouseUpdated = 0;
+    int32 GamepadUpdated = 0;
+
+    if (IMC_MouseKeyboard)
+    {
+        MouseUpdated = ApplyHoldThresholdToIMC(
+            IMC_MouseKeyboard, IA_OfferCard, Settings->OfferDragThresholdSec);
+    }
+    if (IMC_Gamepad)
+    {
+        GamepadUpdated = ApplyHoldThresholdToIMC(
+            IMC_Gamepad, IA_OfferCard, Settings->OfferHoldDurationSec);
+    }
+
+    UE_LOG(LogMossInput, Log,
+        TEXT("[MossInput] ApplySettingsToMappingContext: MouseIMC updated %d, GamepadIMC updated %d"),
+        MouseUpdated, GamepadUpdated);
+}
+
+int32 UMossInputAbstractionSubsystem::ApplyHoldThresholdToIMC(
+    UInputMappingContext* IMC,
+    const UInputAction* TargetAction,
+    float ThresholdSec)
+{
+    if (!IMC || !TargetAction) { return 0; }
+
+    int32 UpdatedCount = 0;
+    // GetMappings()는 const TArray<FEnhancedActionKeyMapping>& 반환.
+    // Mapping.Triggers의 TObjectPtr<UInputTrigger>가 가리키는 UObject는 mutable이므로
+    // HoldTimeThreshold 직접 수정 가능 (BlueprintReadWrite).
+    const TArray<FEnhancedActionKeyMapping>& ReadMappings = IMC->GetMappings();
+    for (const FEnhancedActionKeyMapping& Mapping : ReadMappings)
+    {
+        if (Mapping.Action != TargetAction) { continue; }
+        for (UInputTrigger* Trigger : Mapping.Triggers)
+        {
+            if (UInputTriggerHold* HoldTrigger = Cast<UInputTriggerHold>(Trigger))
+            {
+                HoldTrigger->HoldTimeThreshold = ThresholdSec;
+                UpdatedCount++;
+            }
+        }
+    }
+    return UpdatedCount;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Story-1-13: Input Mode Auto-Detect (Formula 1 Hysteresis)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -290,6 +362,14 @@ void UMossInputAbstractionSubsystem::TransitionToMode(EInputMode NewMode)
 // ─────────────────────────────────────────────────────────────────────────────
 
 #if WITH_AUTOMATION_TESTS
+
+int32 UMossInputAbstractionSubsystem::TestingApplySettingsToSingleIMC(
+    UInputMappingContext* IMC,
+    const UInputAction* TargetAction,
+    float TargetHoldThreshold)
+{
+    return ApplyHoldThresholdToIMC(IMC, TargetAction, TargetHoldThreshold);
+}
 
 int32 UMossInputAbstractionSubsystem::TestingCountLoadedActions() const
 {
