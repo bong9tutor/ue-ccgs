@@ -171,11 +171,11 @@ stories:
     name: "Pipeline 002 — DefaultEngine.ini PrimaryAssetTypesToScan + AC-DP-18 [5.6-VERIFY]"
     file: "production/epics/foundation-data-pipeline/story-002-defaultengine-ini-primary-asset-types.md"
     priority: should-have
-    status: backlog
-    owner: ""
+    status: awaiting-cooked-verification
+    owner: "user-package-manual"
     estimate_days: 0.5
     depends_on: ["1-4"]
-    blocker: ""
+    blocker: "DefaultEngine.ini 등록 완료. Cooked [5.6-VERIFY] 실측은 TD-008 (Story 1-11) 해결 후 Package Project"
     completed: ""
 
   - id: "1-16"

@@ -1,9 +1,10 @@
 # Story 002: DefaultEngine.ini PrimaryAssetTypesToScan 등록 + AC-DP-18 Cooked build 검증
 
 > **Epic**: Data Pipeline
-> **Status**: Ready
+> **Status**: Awaiting Cooked Verification
 > **Layer**: Foundation
 > **Type**: Integration
+> **Estimate**: 0.5 days (~3 hours incl. Package)
 > **Manifest Version**: 2026-04-19
 
 ## Context
@@ -94,3 +95,33 @@
 
 - Depends on: Story 001 (자산 타입 정의)
 - Unlocks: Story 003 (Subsystem이 이 등록에 의존)
+
+---
+
+## Completion Notes (Partial — Awaiting Cooked Verification)
+
+**Partially Completed**: 2026-04-19 (에이전트 완료 부분)
+**Status**: **Awaiting Cooked Verification** — DefaultEngine.ini 등록 완료, [5.6-VERIFY] 실측은 사용자 Package Project 필요.
+
+**에이전트 완료 작업**:
+- `MadeByClaudeCode/Config/DefaultEngine.ini` 수정 — `[/Script/Engine.AssetManagerSettings]` + 3 `+PrimaryAssetTypesToScan`:
+  - DreamData → `/Game/Data/Dreams`
+  - FinalForm → `/Game/Data/FinalForms`
+  - StillnessBudget → `/Game/Data`
+- `production/qa/evidence/cooked-primary-asset-type-placeholder-2026-04-19.md` 신규 — PIE/Cooked 검증 가이드 + 체크리스트
+- tech-debt TD-009 등록 (S2, Sprint 1 완료 게이트)
+
+**ADR 준수**:
+- ADR-0002 §DefaultEngine.ini 필수 등록 — 3 type 모두 등록
+- ADR-0010 §Pipeline 통합 — FinalForm 등록 포함
+- `AssetBaseClass` 경로 `/Script/MadeByClaudeCode.{ClassName}` 형식 엄수
+
+**사용자 수동 검증 필요** (TD-008 해결 후):
+1. Story 1-11 에셋 (TD-008) 생성 선행
+2. `Content/Data/Dreams` + `Content/Data/FinalForms` + `Content/Data` 폴더에 샘플 자산 배치
+3. PIE 실행 → `UAssetManager::GetPrimaryAssetIdList` 호출 로그 확인
+4. Package Project (Windows Development) → Cooked .exe 실행 → 동일 결과
+5. 반대 케이스 (주석처리 후 빈 배열 확인)
+6. Results를 placeholder evidence에 기입
+
+**Sprint 1 완료 게이트**: Cooked [5.6-VERIFY] 실측 + placeholder Results 채우기 완료 시 Status → Complete.
