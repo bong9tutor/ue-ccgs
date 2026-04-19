@@ -1,9 +1,10 @@
 # Story 003: UMossTimeSessionSubsystem 뼈대 + enum 타입 정의 + Developer Settings
 
 > **Epic**: Time & Session System
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
+> **Estimate**: 0.5 days (~3-4 hours)
 > **Manifest Version**: 2026-04-19
 
 ## Context
@@ -156,3 +157,37 @@ private:
 
 - Depends on: Story 001 (IMossClockSource), Story 002 (FSessionRecord)
 - Unlocks: Story 004, 005, 006
+
+---
+
+## Completion Notes
+
+**Completed**: 2026-04-19
+**Criteria**: 6/6 passing (AC-1~6 모두 COVERED)
+**Files delivered**:
+- `MadeByClaudeCode/Source/MadeByClaudeCode/Time/MossTimeSessionTypes.h` (130 lines, 4 enum)
+- `MadeByClaudeCode/Source/MadeByClaudeCode/Settings/MossTimeSessionSettings.h` (187 lines, UDeveloperSettings 7 knobs)
+- `MadeByClaudeCode/Source/MadeByClaudeCode/Time/MossTimeSessionSubsystem.h` (179 lines, 뼈대 + 3 delegates)
+- `MadeByClaudeCode/Source/MadeByClaudeCode/Time/MossTimeSessionSubsystem.cpp` (93 lines, 최소 구현)
+- `MadeByClaudeCode/Source/MadeByClaudeCode/Tests/TimeSessionSubsystemSkeletonTests.cpp` (247 lines, 4 tests)
+- `tests/unit/time-session/README.md` (Story 1-3 섹션 append)
+- `MadeByClaudeCode/Source/MadeByClaudeCode/MadeByClaudeCode.Build.cs` (`"DeveloperSettings"` 모듈 추가)
+
+**Test Evidence**: 4 UE Automation tests — `MossBaby.Time.Subsystem.*` 카테고리 (DelegateBind, ClockSourceInjection, SettingsCDODefaults 7 knobs, StubClassify 2경로)
+**Code Review**: APPROVED (unreal-specialist) + GAPS advisory 2건 (qa-tester)
+**ADR-0001 준수**: 금지 패턴 grep 0 매치 (주석 인용만), `FDateTime::UtcNow`/`FPlatformTime::Seconds` 직접 호출 0건
+**ADR-0011 준수**: 모든 tuning은 `UMossTimeSessionSettings` 경유, const/static constexpr tuning 0건
+
+**Deviations (실제 구현이 Story 원문보다 정확)**:
+- `NarrativeCapPerPlaythrough`에서 `ConfigRestartRequired="true"` 제거 — Story 004가 `ClassifyOnStartup()` 시점에 직접 read하므로 Convention 2 (hot reload) 적용이 더 적합. Story 원문 예시가 오기.
+- `SuspendWallThresholdSec` ClampMin `30.0`으로 설정 (Story 원문 `10.0`) — ToolTip "안전 범위: [30, 300]초" 근거 기술적 정확성.
+
+**Advisory GAPS (tech-debt TD-004, TD-005 등록)**:
+- GAP #1: `EBetweenSessionClass`/`EInSessionClass` 테스트 미참조 (헤더 컴파일로 CODE_REVIEW). Story 004 진입 시 grep/static_assert로 값 개수·이름 검증 권고.
+- GAP #2: `IncrementNarrativeCountAndSave` 동작 + Initialize/Deinitialize integration test 배정 Story 미지정. Story 1-7 Save/Load 연동 또는 별도 integration story 배정 필요.
+
+**Integration test 이관**: `UGameInstanceSubsystem::Initialize(FSubsystemCollectionBase&)` 직접 호출은 `FSubsystemCollectionBase` 내부 구조상 unit test 범위 밖. integration/functional test로 분리, 테스트 파일 상단 주석 + README에 명시.
+
+**Suggestions (비블로킹, 후속 story에서 처리 가능)**:
+- Test 2(ClockSourceInjectionTest)와 Test 4(StubClassifyTest)의 `ClassifyOnStartup(nullptr) → START_DAY_ONE` 검증 중복 — Test 2를 Clock 주입에만 집중시키는 리팩토링 가능.
+- `GetCurrentRecord()` 참조 반환 — Story 004+ 내부 수정 경로가 늘어나면 dangling 위험. 복사 반환으로 전환 검토.
