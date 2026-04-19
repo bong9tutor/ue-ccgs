@@ -214,6 +214,21 @@ void UMossSaveLoadSubsystem::OnSaveTaskComplete()
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// UpdateSessionRecord (Story 1-20 — narrative atomic 지원)
+// ─────────────────────────────────────────────────────────────────────────────
+
+void UMossSaveLoadSubsystem::UpdateSessionRecord(const FSessionRecord& InRecord)
+{
+    if (!SaveData)
+    {
+        UE_LOG(LogMossSaveLoad, Warning,
+            TEXT("UpdateSessionRecord called before SaveData init — no-op"));
+        return;
+    }
+    SaveData->SessionRecord = InRecord;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // FlushOnly (T2 전용)
 // ─────────────────────────────────────────────────────────────────────────────
 

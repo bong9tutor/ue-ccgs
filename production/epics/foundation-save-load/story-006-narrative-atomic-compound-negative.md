@@ -1,9 +1,10 @@
 # Story 006: NarrativeCount Atomic Commit + Compound Event Negative AC (ADR-0009 qualifier)
 
 > **Epic**: Save/Load Persistence
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
+> **Estimate**: 0.5 days (~3 hours)
 > **Manifest Version**: 2026-04-19
 
 ## Context
@@ -170,3 +171,34 @@ void RunCompoundSequenceTest() {
 
 - Depends on: Story 004 (Atomic write), **foundation-time-session Story 003** (IncrementNarrativeCountAndSave single public method — cross-epic)
 - Unlocks: Story 007
+
+---
+
+## Completion Notes
+
+**Completed**: 2026-04-19
+**Criteria**: AC 3중 검증 + Compound negative — 2 AUTOMATED covered + 1 partial (disk round-trip integration) + CI grep
+
+**Files delivered**:
+- `SaveLoad/MossSaveLoadSubsystem.h/.cpp` (수정) — `UpdateSessionRecord(const FSessionRecord&)` public API (in-memory SessionRecord → UMossSaveData 동기화, SaveData null guard)
+- `Time/MossTimeSessionSubsystem.cpp` (수정) — `TriggerSaveForNarrative` no-op 교체: GameInstance/SaveLoadSubsystem null 2단계 guard + UpdateSessionRecord + SaveAsync(ENarrativeEmitted)
+- `Tests/NarrativeAtomicTests.cpp` (신규, 5 tests)
+- `.claude/hooks/narrative-count-atomic-grep.sh` (신규, CI static analysis)
+- `tests/unit/save-load/README.md` Story 1-20 섹션 append
+
+**Test Evidence**: 5 UE Automation — `MossBaby.Narrative.Atomic.*`
+
+**AC 3중 검증**:
+- (1) Round-trip: WrapperUpdatesInMemoryTest + SaveSubsystemUpdateSessionRecordTest (partial — 실제 disk round-trip은 integration TD-005)
+- (2) Static analysis: CI grep hook (`.claude/hooks/narrative-count-atomic-grep.sh`) — 외부 . / -> callsite 탐지 시 exit 1
+- (3) Negative friend-class: 실제 process kill 시뮬 environment-specific → TD-014 문서화로 이관
+- COMPOUND_EVENT_NO_SEQUENCE_ATOMICITY: Save/Load BeginTransaction/Commit API 부재 확인 (per-trigger atomic), Day 13 fault injection은 GSM epic 소관 (ADR-0009)
+- `private:` 가시성: Story 1-3 헤더에서 이미 보장, 컴파일 강제
+
+**ADR/Rule 준수**:
+- ADR-0001 grep: 0 매치
+- ADR-0009: Save/Load에 sequence atomicity API 없음, UpdateSessionRecord는 in-memory 동기화 전용
+
+**Deferred**:
+- TD-005: Disk round-trip integration (UGameInstance + 실제 lifecycle)
+- TD-014: Day 13 compound event fault injection (GSM epic integration)

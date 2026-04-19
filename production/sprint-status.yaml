@@ -228,12 +228,12 @@ stories:
     name: "Save/Load 006 — NarrativeCount atomic + Compound negative AC"
     file: "production/epics/foundation-save-load/story-006-narrative-atomic-compound-negative.md"
     priority: nice-to-have
-    status: backlog
-    owner: ""
+    status: done
+    owner: "unreal-specialist"
     estimate_days: 0.5
     depends_on: ["1-10"]
     blocker: ""
-    completed: ""
+    completed: "2026-04-19"
 
   - id: "1-21"
     name: "Input 005 — NO_RAW_KEY_BINDING CI grep + Mouse-only MANUAL"

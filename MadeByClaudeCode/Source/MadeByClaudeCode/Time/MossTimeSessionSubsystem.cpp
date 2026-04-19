@@ -22,6 +22,8 @@
 
 #include "Time/MossTimeSessionSubsystem.h"
 #include "Settings/MossTimeSessionSettings.h"
+#include "SaveLoad/MossSaveLoadSubsystem.h"
+#include "SaveLoad/MossSaveData.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogMossTime, Log, All);
 
@@ -164,8 +166,27 @@ void UMossTimeSessionSubsystem::IncrementNarrativeCount()
 
 void UMossTimeSessionSubsystem::TriggerSaveForNarrative()
 {
-    // Story 1-7 SaveSubsystem 연동 후 구현.
-    // 현재 no-op.
+    // Story 1-20: SaveSubsystem 연동 구현. no-op 스텁 교체.
+    UGameInstance* GI = GetGameInstance();
+    if (!GI)
+    {
+        UE_LOG(LogMossTime, Warning,
+            TEXT("TriggerSaveForNarrative — GameInstance null, save skipped"));
+        return;
+    }
+
+    UMossSaveLoadSubsystem* Save = GI->GetSubsystem<UMossSaveLoadSubsystem>();
+    if (!Save)
+    {
+        UE_LOG(LogMossTime, Warning,
+            TEXT("TriggerSaveForNarrative — SaveLoadSubsystem null, save skipped"));
+        return;
+    }
+
+    // Sync in-memory SessionRecord into SaveData + async write.
+    // ADR-0009: UpdateSessionRecord은 in-memory 동기화만. disk write는 SaveAsync가 담당.
+    Save->UpdateSessionRecord(CurrentRecord);
+    Save->SaveAsync(ESaveReason::ENarrativeEmitted);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

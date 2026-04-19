@@ -199,6 +199,17 @@ public:
     void SaveAsync(ESaveReason Reason);
 
     /**
+     * Time System의 CurrentRecord를 UMossSaveData.SessionRecord에 동기화.
+     * Story 1-20 narrative atomic wrapper 지원 — 실제 disk write는 SaveAsync 호출 필요.
+     *
+     * SaveData가 nullptr인 경우(Initialize 미호출 상태) no-op + Warning 로그.
+     * ADR-0009 준수: 이 함수는 in-memory 동기화만 수행. disk write는 SaveAsync(ENarrativeEmitted) 책임.
+     *
+     * @param InRecord  Time 서브시스템의 최신 CurrentRecord.
+     */
+    void UpdateSessionRecord(const FSessionRecord& InRecord);
+
+    /**
      * T2 전용 Alt+Tab 플러시.
      *
      * deactivation 시 Idle 상태이면 SaveAsync 1회 트리거.

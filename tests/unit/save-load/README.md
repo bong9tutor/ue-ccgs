@@ -247,12 +247,89 @@ UnrealEditor-Cmd.exe MadeByClaudeCode.uproject \
 
 ---
 
+---
+
+## Story 1-20 — NarrativeCount Atomic Commit + Compound Event Negative AC
+
+- 실제 cpp: `MadeByClaudeCode/Source/MadeByClaudeCode/Tests/NarrativeAtomicTests.cpp`
+- 카테고리: `MossBaby.Narrative.Atomic.*`
+- CI hook: `.claude/hooks/narrative-count-atomic-grep.sh`
+
+### 테스트 함수 목록
+
+| 함수명 | 카테고리 | AC |
+|--------|----------|----|
+| `FNarrativeWrapperUpdatesInMemoryTest` | `MossBaby.Narrative.Atomic.WrapperUpdatesInMemory` | NARRATIVE_COUNT_ATOMIC_COMMIT (1) in-memory |
+| `FNarrativeSaveSubsystemUpdateSessionRecordTest` | `MossBaby.Narrative.Atomic.SaveSubsystemUpdateSessionRecord` | UpdateSessionRecord 동기화 |
+| `FNarrativeUpdateSessionRecordNullGuardTest` | `MossBaby.Narrative.Atomic.UpdateSessionRecordNullGuard` | null guard (crash 없이 반환) |
+| `FCompoundEventNoSequenceAtomicityTest` | `MossBaby.Narrative.Atomic.CompoundEventNoSequenceAtomicity` | COMPOUND_EVENT_NO_SEQUENCE_ATOMICITY |
+| `FNarrativePrivateVisibilityWrapperExistsTest` | `MossBaby.Narrative.Atomic.PrivateVisibilityWrapperExists` | private 가시성 + wrapper 존재 확인 |
+
+### AC 3중 검증 상태
+
+| 검증 항목 | 방법 | 상태 |
+|-----------|------|------|
+| **1) Round-trip (in-memory partial)** | `WrapperUpdatesInMemoryTest` — in-memory NarrativeCount +1 확인. 실제 disk round-trip은 integration TD-005 | AUTOMATED (partial) |
+| **2) Static analysis (CI gate)** | `.claude/hooks/narrative-count-atomic-grep.sh` — exit 0 = 외부 . / -> callsite 0건 | CI hook (BLOCKING) |
+| **3) Negative (private visibility)** | `PrivateVisibilityWrapperExistsTest` + 컴파일러 강제. process kill 시뮬은 environment-specific → 문서화로 대체 (TD-014) | AUTOMATED (wrapper) + CODE_REVIEW (컴파일 강제) |
+
+### COMPOUND_EVENT_NO_SEQUENCE_ATOMICITY 검증
+
+- **의미**: Save/Load는 per-trigger atomic만 보장. Sequence atomicity API 없음 (ADR-0009 금지)
+- **확인 방법**:
+  - `FCompoundEventNoSequenceAtomicityTest`: SaveAsync 3회 연속 → IOCommitCount 범위 확인 + API 부재 로그
+  - `UMossSaveLoadSubsystem`에 `BeginTransaction` / `CommitTransaction` 멤버 없음 (컴파일 강제)
+- **실제 Day 13 fault injection**: ECardOffered → EDreamReceived(fault) → ENarrativeEmitted 시나리오는 GSM epic TD-014에서 integration 검증
+- **ADR-0009**: Compound event sequence atomicity = `UMossGameStateSubsystem::BeginCompoundEvent/EndCompoundEvent` 책임 (GSM epic)
+
+### 구현 파일 목록
+
+| 역할 | 경로 |
+|------|------|
+| 테스트 구현 | `MadeByClaudeCode/Source/MadeByClaudeCode/Tests/NarrativeAtomicTests.cpp` |
+| CI static analysis hook | `.claude/hooks/narrative-count-atomic-grep.sh` |
+| Save subsystem (UpdateSessionRecord 추가) | `MadeByClaudeCode/Source/MadeByClaudeCode/SaveLoad/MossSaveLoadSubsystem.h/.cpp` |
+| Time subsystem (TriggerSaveForNarrative 실구현) | `MadeByClaudeCode/Source/MadeByClaudeCode/Time/MossTimeSessionSubsystem.cpp` |
+
+### 핵심 설계 불변식
+
+- `IncrementNarrativeCount()` / `TriggerSaveForNarrative()` — `private:` 가시성 (Story 1-3 헤더, 컴파일 강제)
+- 외부 코드는 반드시 `IncrementNarrativeCountAndSave()` wrapper 사용
+- `UpdateSessionRecord(FSessionRecord)` — in-memory 동기화 전용. disk write = `SaveAsync(ENarrativeEmitted)` 책임
+- Save/Load에 sequence-level API 없음 (ADR-0009 금지 조항)
+
+### Tech-debt / 이관 항목
+
+| 항목 | 이유 | 식별자 |
+|------|------|--------|
+| 실제 disk round-trip 확인 (disk NarrativeCount=3) | GameInstance 없는 단위 테스트 환경에서는 save skip | TD-005 (integration) |
+| process kill 시뮬 (cap leak proof) | environment-specific | TD-014 (GSM epic fault injection) |
+| Day 13 compound event sequence fault injection | 3-trigger + fault injection은 integration 환경 전용 | TD-014 |
+
+### 실행 명령 (headless)
+
+```bash
+UnrealEditor-Cmd.exe MadeByClaudeCode.uproject \
+  -ExecCmds="Automation RunTests MossBaby.Narrative.Atomic.; Quit" \
+  -nullrhi -nosound -log -unattended
+```
+
+CI static analysis hook:
+
+```bash
+bash .claude/hooks/narrative-count-atomic-grep.sh
+# exit 0: OK
+# exit 1: 외부 callsite 발견 — 빌드 차단
+```
+
+---
+
 ## 미구현 스토리 (Out of Scope)
 
 | Story | 내용 | 상태 |
 |-------|------|------|
-| Story 1-20 | Async TFuture worker thread 위임 + T1 viewport 실제 바인딩 | 미시작 |
+| Story 1-20 Async TFuture | TFuture worker thread 위임 + T1 viewport 실제 바인딩 | 별도 Async 구현 defer |
 
 ---
 
-*최종 업데이트: 2026-04-19 — Story 1-16 완료*
+*최종 업데이트: 2026-04-19 — Story 1-20 완료*
