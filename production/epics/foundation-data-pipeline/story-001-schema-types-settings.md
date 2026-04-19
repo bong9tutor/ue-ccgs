@@ -1,9 +1,10 @@
 # Story 001: Schema Types (FGiftCardRow, UMossFinalFormAsset, UDreamDataAsset, UStillnessBudgetAsset) + Developer Settings
 
 > **Epic**: Data Pipeline
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
+> **Estimate**: 0.5 days (~3-4 hours)
 > **Manifest Version**: 2026-04-19
 
 ## Context
@@ -182,3 +183,38 @@ public:
 
 - Depends on: None (Foundation 독립 — Growth epic `EGrowthStage` forward declare 가능)
 - Unlocks: Story 002, 003
+
+---
+
+## Completion Notes
+
+**Completed**: 2026-04-19
+**Criteria**: 6/6 passing (AC-1~6 모두 COVERED — 5 AUTOMATED + 1 CODE_REVIEW)
+**Files delivered** (8건):
+- `MadeByClaudeCode/Source/MadeByClaudeCode/Data/GiftCardRow.h` (56 lines, FTableRowBase)
+- `MadeByClaudeCode/Source/MadeByClaudeCode/Data/MossFinalFormAsset.h` (68 lines)
+- `MadeByClaudeCode/Source/MadeByClaudeCode/Data/DreamDataAsset.h` (78 lines)
+- `MadeByClaudeCode/Source/MadeByClaudeCode/Data/StillnessBudgetAsset.h` (56 lines)
+- `MadeByClaudeCode/Source/MadeByClaudeCode/Data/GrowthStage.h` (43 lines, **임시 공용 enum**)
+- `MadeByClaudeCode/Source/MadeByClaudeCode/Settings/MossDataPipelineSettings.h` (152 lines, 9 knobs + EDuplicateCardIdPolicy)
+- `MadeByClaudeCode/Source/MadeByClaudeCode/Tests/DataPipelineSchemaTests.cpp` (5 tests, `MossBaby.Data.Schema.*`)
+- `tests/unit/data-pipeline/README.md` (evidence index + C1 grep 명령)
+
+**C1 Schema Gate**: `grep -rE "(int32|float|double) [A-Z]" GiftCardRow.h` → **0 매치** ✅
+**C2 Schema Gate**: DreamDataAsset의 TriggerThreshold/TriggerTagWeights/EarliestDay 모두 `UPROPERTY` 노출, 하드코딩 0건 ✅
+
+**Test Evidence**: 5 tests (`FDataPipelineSettingsCDOTest` 9 knobs, `FFinalFormAssetGetPrimaryAssetIdTest`, `FDreamDataAssetGetPrimaryAssetIdTest`, `FDreamDataAssetDefaultsTest`, `FStillnessBudgetAssetDefaultsTest`). QA GAP 2건 인라인 보완 (RequiredStage 기본값 + StillnessBudget PrimaryAssetType 검증 추가).
+
+**Code Review**: APPROVED (unreal-specialist) + GAPS→RESOLVED (qa-tester 2건 인라인 보완)
+**ADR 준수**:
+- ADR-0001: 금지 패턴 grep 0 매치 (주석 인용만)
+- ADR-0002: Card=DataTable+FGiftCardRow, FinalForm/Dream/Stillness=UPrimaryDataAsset ✅
+- ADR-0010: per-form 격상 + TMap 인라인 편집 ✅
+- ADR-0011: UDeveloperSettings + GetCategoryName/SectionName + static Get() ✅
+
+**Deviations / Notes**:
+- **ADVISORY (TD-006)**: `Data/GrowthStage.h` 임시 공용 enum — `core-moss-baby-character` epic 진입 시 `Characters/` 폴더로 이동 예정. `DreamDataAsset.h`의 `#include` 경로 업데이트 + 다른 파일이 include 시작할 경우 리팩토링 범위 확장 위험.
+- **긍정적 관찰**: `FGiftCardRow.IconPath`에 `AllowedClasses="Texture2D"` 에디터 가드 자발 추가 (Story 스펙 이상의 방어).
+
+**제안 (unreal-specialist, 비블로킹)**:
+- `TMap<FName, float>`의 `ClampMin/Max` 메타가 UE 5.6 에디터에서 실제 Value 필드에 적용되는지 Growth sprint 초기 수동 검증 권고. 미동작 시 `UEditorValidatorBase`로 보완.
