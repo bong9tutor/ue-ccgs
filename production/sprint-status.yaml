@@ -6,7 +6,7 @@ goal: "Foundation 4 시스템의 뼈대와 핵심 계약 확립 — Core sprint 
 start: "2026-04-21"
 end: "2026-05-02"
 generated: "2026-04-19"
-updated: "2026-04-19 (Story 1-1~1-10 COMPLETE, 1-11 awaiting-editor)"
+updated: "2026-04-19 (Story 1-1~1-10 + 1-12 COMPLETE, 1-11 awaiting-editor)"
 
 stories:
   # === Must Have (Critical Path — Foundation skeleton) ===
@@ -136,12 +136,12 @@ stories:
     name: "Input 002 — UMossInputAbstractionSubsystem + Settings + IMC 등록"
     file: "production/epics/foundation-input-abstraction/story-002-subsystem-settings-mapping-registration.md"
     priority: must-have
-    status: backlog
-    owner: ""
+    status: done
+    owner: "unreal-specialist"
     estimate_days: 0.5
     depends_on: ["1-11"]
-    blocker: ""
-    completed: ""
+    blocker: "C++ 부분 완료. 런타임 IMC 등록 검증은 1-11 에셋 생성 후 (TD-008)"
+    completed: "2026-04-19"
 
   - id: "1-13"
     name: "Input 003 — Auto-detection + Hysteresis + OnInputModeChanged"

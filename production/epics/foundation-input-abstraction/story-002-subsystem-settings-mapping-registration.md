@@ -1,9 +1,10 @@
 # Story 002: UMossInputAbstractionSubsystem + UMossInputAbstractionSettings + IMC 등록
 
 > **Epic**: Input Abstraction Layer
-> **Status**: Ready
+> **Status**: Complete
 > **Layer**: Foundation
 > **Type**: Logic
+> **Estimate**: 0.5 days (~3-4 hours)
 > **Manifest Version**: 2026-04-19
 
 ## Context
@@ -165,3 +166,40 @@ void UMossInputAbstractionSubsystem::RegisterMappingContext(APlayerController* P
 
 - Depends on: Story 001 (6 Action + 2 IMC 에셋)
 - Unlocks: Story 003, 004
+
+---
+
+## Completion Notes
+
+**Completed**: 2026-04-19
+**Criteria**: 5/5 passing (모두 AUTOMATED)
+**Dependency note**: Story 1-11 에셋 TD-008 Open 상태 — 에셋 미생성 시 null 허용 정책으로 Subsystem 안전 동작. 에셋 생성 후 런타임 검증 필요.
+
+**Files delivered**:
+- `Settings/MossInputAbstractionSettings.h` (96 lines, 3 knobs)
+- `Input/MossInputAbstractionSubsystem.h` (171 lines, 뼈대 + 테스트 훅)
+- `Input/MossInputAbstractionSubsystem.cpp` (200 lines, LoadInputAssets + RegisterMappingContext + safe null 정책)
+- `Tests/InputAbstractionSubsystemTests.cpp` (230 lines, 5 tests)
+- `tests/unit/input/README.md` (신규 폴더)
+
+**Test Evidence**: 5 UE Automation — `MossBaby.Input.Subsystem.{InitialState/SettingsCDO/NullAssetsAllowed/MockActionInjection/ModeEnum}`
+
+**ADR 준수**:
+- ADR-0001 grep: 0 매치
+- ADR-0011: Category="Moss Baby", Section="Input Abstraction", static Get, `OfferDragThresholdSec` ConfigRestartRequired 적용
+
+**Deviations**:
+- `OfferHoldDurationSec` ConfigRestartRequired 미적용 (Story 원문 spec은 true). Agent 판단: Story 1-17에서 캐싱 여부 결정 예정으로 보류. Story 1-17 착수 시 정책 확정 필요 (재검토 여부 → Story 1-17에 dependency note 추가 권고).
+- `LoadObject` 직접 사용 (FSoftObjectPath 대신) — Story 원문 line 123 "GDD Upstream Dep 래핑만 목표" 명시 준수.
+
+**Engine Notes**:
+- `UEnhancedInputLocalPlayerSubsystem::AddMappingContext(IMC, Priority=1)` 사용
+- PlayerController가 Initialize 시점에 부재할 수 있음 (GameInstance init 순서) — Warning 로그 + 배포 시 FGameModeEvents::GameModePostLoginEvent 구독 권장 (Story 1-20)
+
+**Deferred**:
+- IMC 등록 실제 PIE/런타임 검증 — 에셋 생성 후 integration test (TD-005)
+- Input mode auto-detection — Story 1-13 다음
+
+**Out of Scope (다음 스토리)**:
+- Story 1-13: Auto-detect + hysteresis + OnInputModeChanged delegate
+- Story 1-17: Offer Hold Formula 2 boundary tests
